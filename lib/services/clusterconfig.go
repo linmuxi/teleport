@@ -84,11 +84,11 @@ type ClusterConfig interface {
 
 	// GetKeepAliveCountMax gets the number of missed keep-alive messages before
 	// the server disconnects the client.
-	GetKeepAliveCountMax() int
+	GetKeepAliveCountMax() int64
 
 	// SetKeepAliveCountMax sets the number of missed keep-alive messages before
 	// the server disconnects the client.
-	SetKeepAliveCountMax(c int)
+	SetKeepAliveCountMax(c int64)
 
 	// Copy creates a copy of the resource and returns it.
 	Copy() ClusterConfig
@@ -126,26 +126,9 @@ func DefaultClusterConfig() ClusterConfig {
 			SessionRecording:    RecordAtNode,
 			ProxyChecksHostKeys: HostKeyCheckYes,
 			KeepAliveInterval:   NewDuration(defaults.KeepAliveInterval),
-			KeepAliveCountMax:   defaults.KeepAliveCountMax,
+			KeepAliveCountMax:   int64(defaults.KeepAliveCountMax),
 		},
 	}
-}
-
-// AuditConfig represents audit log settings in the cluster
-type AuditConfig struct {
-	// Type is audit backend type
-	Type string `json:"type,omitempty"`
-	// Region is a region setting for audit sessions used by cloud providers
-	Region string `json:"region,omitempty"`
-	// AuditSessionsURI is a parameter where to upload sessions
-	AuditSessionsURI string `json:"audit_sessions_uri,omitempty"`
-	// AuditEventsURI is a parameter with all supported outputs
-	// for audit events
-	AuditEventsURI utils.Strings `json:"audit_events_uri,omitempty"`
-	// AuditTableName is a DB table name used for audits
-	// Deprecated in favor of AuditEventsURI
-	// DELETE IN (3.1.0)
-	AuditTableName string `json:"audit_table_name,omitempty"`
 }
 
 // ShouldUploadSessions returns whether audit config
@@ -164,21 +147,6 @@ func AuditConfigFromObject(in interface{}) (*AuditConfig, error) {
 		return nil, trace.Wrap(err)
 	}
 	return &cfg, nil
-}
-
-// ClusterConfigV3 implements the ClusterConfig interface.
-type ClusterConfigV3 struct {
-	// Kind is a resource kind - always resource.
-	Kind string `json:"kind"`
-
-	// Version is a resource version.
-	Version string `json:"version"`
-
-	// Metadata is metadata about the resource.
-	Metadata Metadata `json:"metadata"`
-
-	// Spec is the specification of the resource.
-	Spec ClusterConfigSpecV3 `json:"spec"`
 }
 
 const (
@@ -203,36 +171,14 @@ const (
 	HostKeyCheckNo string = "no"
 )
 
-// ClusterConfigSpecV3 is the actual data we care about for ClusterConfig.
-type ClusterConfigSpecV3 struct {
-	// SessionRecording controls where (or if) the session is recorded.
-	SessionRecording string `json:"session_recording"`
+// GetSubKind returns resource subkind
+func (c *ClusterConfigV3) GetSubKind() string {
+	return c.SubKind
+}
 
-	// ClusterID is the unique cluster ID that is set once during the first auth
-	// server startup.
-	ClusterID string `json:"cluster_id"`
-
-	// ProxyChecksHostKeys is used to control if the proxy will check host keys
-	// when in recording mode.
-	ProxyChecksHostKeys string `json:"proxy_checks_host_keys"`
-
-	// Audit is a section with audit config
-	Audit AuditConfig `json:"audit"`
-
-	// ClientIdleTimeout sets global cluster default setting for client idle timeouts
-	ClientIdleTimeout Duration `json:"client_idle_timeout"`
-
-	// DisconnectExpiredCert provides disconnect expired certificate setting -
-	// if true, connections with expired client certificates will get disconnected
-	DisconnectExpiredCert Bool `json:"disconnect_expired_cert"`
-
-	// KeepAliveInterval is the interval the server sends keep-alive messsages
-	// to the client at.
-	KeepAliveInterval Duration `json:"keep_alive_interval"`
-
-	// KeepAliveCountMax is the number of keep-alive messages that can be missed before
-	// the server disconnects the connection to the client.
-	KeepAliveCountMax int `json:"keep_alive_count_max"`
+// GetKind returns resource kind
+func (c *ClusterConfigV3) GetKind() string {
+	return c.Kind
 }
 
 // GetResourceID returns resource ID
@@ -327,12 +273,12 @@ func (c *ClusterConfigV3) SetClientIdleTimeout(d time.Duration) {
 
 // GetDisconnectExpiredCert returns disconnect expired certificate setting
 func (c *ClusterConfigV3) GetDisconnectExpiredCert() bool {
-	return c.Spec.DisconnectExpiredCert.bool
+	return c.Spec.DisconnectExpiredCert.Value()
 }
 
 // SetDisconnectExpiredCert sets disconnect client with expired certificate setting
 func (c *ClusterConfigV3) SetDisconnectExpiredCert(b bool) {
-	c.Spec.DisconnectExpiredCert.bool = b
+	c.Spec.DisconnectExpiredCert = NewBool(b)
 }
 
 // GetKeepAliveInterval gets the keep-alive interval.
@@ -347,13 +293,13 @@ func (c *ClusterConfigV3) SetKeepAliveInterval(t time.Duration) {
 
 // GetKeepAliveCountMax gets the number of missed keep-alive messages before
 // the server disconnects the client.
-func (c *ClusterConfigV3) GetKeepAliveCountMax() int {
+func (c *ClusterConfigV3) GetKeepAliveCountMax() int64 {
 	return c.Spec.KeepAliveCountMax
 }
 
 // SetKeepAliveCountMax sets the number of missed keep-alive messages before
 // the server disconnects the client.
-func (c *ClusterConfigV3) SetKeepAliveCountMax(m int) {
+func (c *ClusterConfigV3) SetKeepAliveCountMax(m int64) {
 	c.Spec.KeepAliveCountMax = m
 }
 
@@ -392,7 +338,7 @@ func (c *ClusterConfigV3) CheckAndSetDefaults() error {
 		c.Spec.KeepAliveInterval = NewDuration(defaults.KeepAliveInterval)
 	}
 	if c.Spec.KeepAliveCountMax == 0 {
-		c.Spec.KeepAliveCountMax = defaults.KeepAliveCountMax
+		c.Spec.KeepAliveCountMax = int64(defaults.KeepAliveCountMax)
 	}
 
 	return nil
@@ -483,7 +429,7 @@ func GetClusterConfigSchema(extensionSchema string) string {
 // mostly adds support for extended versions.
 type ClusterConfigMarshaler interface {
 	Marshal(c ClusterConfig, opts ...MarshalOption) ([]byte, error)
-	Unmarshal(bytes []byte) (ClusterConfig, error)
+	Unmarshal(bytes []byte, opts ...MarshalOption) (ClusterConfig, error)
 }
 
 var clusterConfigMarshaler ClusterConfigMarshaler = &TeleportClusterConfigMarshaler{}
@@ -506,22 +452,35 @@ func GetClusterConfigMarshaler() ClusterConfigMarshaler {
 type TeleportClusterConfigMarshaler struct{}
 
 // Unmarshal unmarshals ClusterConfig from JSON.
-func (t *TeleportClusterConfigMarshaler) Unmarshal(bytes []byte) (ClusterConfig, error) {
+func (t *TeleportClusterConfigMarshaler) Unmarshal(bytes []byte, opts ...MarshalOption) (ClusterConfig, error) {
 	var clusterConfig ClusterConfigV3
 
 	if len(bytes) == 0 {
 		return nil, trace.BadParameter("missing resource data")
 	}
 
-	err := utils.UnmarshalWithSchema(GetClusterConfigSchema(""), &clusterConfig, bytes)
+	cfg, err := collectOptions(opts)
 	if err != nil {
-		return nil, trace.BadParameter(err.Error())
+		return nil, trace.Wrap(err)
+	}
+
+	if cfg.SkipValidation {
+		if err := utils.FastUnmarshal(bytes, &clusterConfig); err != nil {
+			return nil, trace.BadParameter(err.Error())
+		}
+	} else {
+		err = utils.UnmarshalWithSchema(GetClusterConfigSchema(""), &clusterConfig, bytes)
+		if err != nil {
+			return nil, trace.BadParameter(err.Error())
+		}
 	}
 
 	err = clusterConfig.CheckAndSetDefaults()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+
+	clusterConfig.SetResourceID(cfg.ID)
 
 	return &clusterConfig, nil
 }

@@ -52,8 +52,11 @@ type AccessPoint interface {
 	// server / certificate authority (CA)
 	GetDomainName() (string, error)
 
+	// GetClusterName returns cluster name
+	GetClusterName(opts ...services.MarshalOption) (services.ClusterName, error)
+
 	// GetClusterConfig returns cluster level configuration.
-	GetClusterConfig() (services.ClusterConfig, error)
+	GetClusterConfig(opts ...services.MarshalOption) (services.ClusterConfig, error)
 
 	// GetNamespaces returns a list of namespaces
 	GetNamespaces() ([]services.Namespace, error)
@@ -96,4 +99,33 @@ type AccessPoint interface {
 
 	// GetAllTunnelConnections returns all tunnel connections
 	GetAllTunnelConnections(opts ...services.MarshalOption) ([]services.TunnelConnection, error)
+}
+
+// AccessCache is a subset of the interface working on the certificate authorities
+type AccessCache interface {
+	// GetCertAuthority returns cert authority by id
+	GetCertAuthority(id services.CertAuthID, loadKeys bool, opts ...services.MarshalOption) (services.CertAuthority, error)
+
+	// GetCertAuthorities returns a list of cert authorities
+	GetCertAuthorities(caType services.CertAuthType, loadKeys bool, opts ...services.MarshalOption) ([]services.CertAuthority, error)
+
+	// GetClusterConfig returns cluster level configuration.
+	GetClusterConfig(opts ...services.MarshalOption) (services.ClusterConfig, error)
+
+	// GetClusterName gets the name of the cluster from the backend.
+	GetClusterName(opts ...services.MarshalOption) (services.ClusterName, error)
+}
+
+// AuthCache is a subset of the interface working on the certificate authorities
+type AuthCache interface {
+	AccessCache
+
+	// GetStaticTokens gets the list of static tokens used to provision nodes.
+	GetStaticTokens() (services.StaticTokens, error)
+
+	// GetTokens returns all active (non-expired) provisioning tokens
+	GetTokens(opts ...services.MarshalOption) ([]services.ProvisionToken, error)
+
+	// GetToken finds and returns token by ID
+	GetToken(token string) (services.ProvisionToken, error)
 }

@@ -126,8 +126,10 @@ func (s *Sanitizer) KeepAlive(ctx context.Context, lease Lease, expires time.Tim
 
 // NewWatcher returns a new event watcher
 func (s *Sanitizer) NewWatcher(ctx context.Context, watch Watch) (Watcher, error) {
-	if !isKeySafe(watch.Prefix) {
-		return nil, trace.BadParameter(errorMessage)
+	for _, prefix := range watch.Prefixes {
+		if !isKeySafe(prefix) {
+			return nil, trace.BadParameter(errorMessage)
+		}
 	}
 	return s.backend.NewWatcher(ctx, watch)
 }

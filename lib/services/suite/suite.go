@@ -405,16 +405,19 @@ func (s *ServicesTestSuite) WebSessionCRUD(c *check.C) {
 
 func (s *ServicesTestSuite) TokenCRUD(c *check.C) {
 	_, err := s.ProvisioningS.GetToken("token")
-	c.Assert(trace.IsNotFound(err), check.Equals, true, check.Commentf("%#v", err))
+	fixtures.ExpectNotFound(c, err)
 
-	c.Assert(s.ProvisioningS.UpsertToken("token", teleport.Roles{teleport.RoleAuth, teleport.RoleNode}, 0), check.IsNil)
+	t, err := services.NewProvisionToken("token", teleport.Roles{teleport.RoleAuth, teleport.RoleNode}, time.Time{})
+	c.Assert(err, check.IsNil)
+
+	c.Assert(s.ProvisioningS.UpsertToken(t), check.IsNil)
 
 	token, err := s.ProvisioningS.GetToken("token")
 	c.Assert(err, check.IsNil)
-	c.Assert(token.Roles.Include(teleport.RoleAuth), check.Equals, true)
-	c.Assert(token.Roles.Include(teleport.RoleNode), check.Equals, true)
-	c.Assert(token.Roles.Include(teleport.RoleProxy), check.Equals, false)
-	diff := time.Now().UTC().Add(defaults.ProvisioningTokenTTL).Second() - token.Expires.Second()
+	c.Assert(token.GetRoles().Include(teleport.RoleAuth), check.Equals, true)
+	c.Assert(token.GetRoles().Include(teleport.RoleNode), check.Equals, true)
+	c.Assert(token.GetRoles().Include(teleport.RoleProxy), check.Equals, false)
+	diff := time.Now().UTC().Add(defaults.ProvisioningTokenTTL).Second() - token.Expiry().Second()
 	if diff > 1 {
 		c.Fatalf("expected diff to be within one second, got %v instead", diff)
 	}
@@ -423,6 +426,49 @@ func (s *ServicesTestSuite) TokenCRUD(c *check.C) {
 
 	_, err = s.ProvisioningS.GetToken("token")
 	fixtures.ExpectNotFound(c, err)
+
+	// check tokens backwards compatibility and marshal/unmarshal
+	expiry := time.Now().UTC().Add(time.Hour)
+	v1 := &services.ProvisionTokenV1{
+		Token:   "old",
+		Roles:   teleport.Roles{teleport.RoleNode, teleport.RoleProxy},
+		Expires: expiry,
+	}
+	v2, err := services.NewProvisionToken(v1.Token, v1.Roles, expiry)
+	c.Assert(err, check.IsNil)
+
+	// Tokens in different version formats are backwards and forwards
+	// compatible
+	fixtures.DeepCompare(c, v1.V2(), v2)
+	fixtures.DeepCompare(c, v2.V1(), v1)
+
+	// Marshal V1, unmarshal V2
+	data, err := services.MarshalProvisionToken(v2, services.WithVersion(services.V1))
+	c.Assert(err, check.IsNil)
+
+	out, err := services.UnmarshalProvisionToken(data)
+	c.Assert(err, check.IsNil)
+	fixtures.DeepCompare(c, out, v2)
+
+	// Test delete all tokens
+	t, err = services.NewProvisionToken("token1", teleport.Roles{teleport.RoleAuth, teleport.RoleNode}, time.Time{})
+	c.Assert(err, check.IsNil)
+	c.Assert(s.ProvisioningS.UpsertToken(t), check.IsNil)
+
+	t, err = services.NewProvisionToken("token2", teleport.Roles{teleport.RoleAuth, teleport.RoleNode}, time.Time{})
+	c.Assert(err, check.IsNil)
+	c.Assert(s.ProvisioningS.UpsertToken(t), check.IsNil)
+
+	tokens, err := s.ProvisioningS.GetTokens()
+	c.Assert(err, check.IsNil)
+	c.Assert(tokens, check.HasLen, 2)
+
+	err = s.ProvisioningS.DeleteAllTokens()
+	c.Assert(err, check.IsNil)
+
+	tokens, err = s.ProvisioningS.GetTokens()
+	c.Assert(err, check.IsNil)
+	c.Assert(tokens, check.HasLen, 0)
 }
 
 func (s *ServicesTestSuite) RolesCRUD(c *check.C) {
@@ -790,8 +836,62 @@ func (s *ServicesTestSuite) AuthPreference(c *check.C) {
 	c.Assert(gotAP.GetSecondFactor(), check.Equals, "otp")
 }
 
+func (s *ServicesTestSuite) StaticTokens(c *check.C) {
+	// set static tokens
+	staticTokens, err := services.NewStaticTokens(services.StaticTokensSpecV2{
+		StaticTokens: []services.ProvisionTokenV1{
+			{
+				Token:   "tok1",
+				Roles:   teleport.Roles{teleport.RoleNode},
+				Expires: time.Now().UTC().Add(time.Hour),
+			},
+		},
+	})
+	c.Assert(err, check.IsNil)
+
+	err = s.ConfigS.SetStaticTokens(staticTokens)
+	c.Assert(err, check.IsNil)
+
+	out, err := s.ConfigS.GetStaticTokens()
+	c.Assert(err, check.IsNil)
+	staticTokens.SetResourceID(out.GetResourceID())
+	fixtures.DeepCompare(c, staticTokens, out)
+
+	err = s.ConfigS.DeleteStaticTokens()
+	c.Assert(err, check.IsNil)
+
+	_, err = s.ConfigS.GetStaticTokens()
+	fixtures.ExpectNotFound(c, err)
+}
+
+// SuiteOptions provides functional arguments
+// to turn certain parts of the test suite off
+type SuiteOptions struct {
+	// SkipDelete turns off deletes in tests
+	SkipDelete bool
+}
+
+// SuiteOption is a functional suite option
+type SuiteOption func(s *SuiteOptions)
+
+// SkipDelete instructs tests to skip testing delete features
+func SkipDelete() SuiteOption {
+	return func(s *SuiteOptions) {
+		s.SkipDelete = true
+	}
+}
+
+// CollectOptions collects suite options
+func CollectOptions(opts ...SuiteOption) SuiteOptions {
+	var suiteOpts SuiteOptions
+	for _, o := range opts {
+		o(&suiteOpts)
+	}
+	return suiteOpts
+}
+
 // ClusterConfig tests cluster configuration
-func (s *ServicesTestSuite) ClusterConfig(c *check.C) {
+func (s *ServicesTestSuite) ClusterConfig(c *check.C, opts ...SuiteOption) {
 	config, err := services.NewClusterConfig(services.ClusterConfigSpecV3{
 		ClientIdleTimeout:     services.NewDuration(17 * time.Second),
 		DisconnectExpiredCert: services.NewBool(true),
@@ -812,16 +912,64 @@ func (s *ServicesTestSuite) ClusterConfig(c *check.C) {
 
 	gotConfig, err := s.ConfigS.GetClusterConfig()
 	c.Assert(err, check.IsNil)
-
+	config.SetResourceID(gotConfig.GetResourceID())
 	fixtures.DeepCompare(c, config, gotConfig)
+
+	// Some parts (e.g. auth server) will not function
+	// without cluster name or cluster config
+	if CollectOptions(opts...).SkipDelete {
+		return
+	}
+	err = s.ConfigS.DeleteClusterConfig()
+	c.Assert(err, check.IsNil)
+
+	_, err = s.ConfigS.GetClusterConfig()
+	fixtures.ExpectNotFound(c, err)
+
+	clusterName, err := services.NewClusterName(services.ClusterNameSpecV2{
+		ClusterName: "example.com",
+	})
+	c.Assert(err, check.IsNil)
+
+	err = s.ConfigS.SetClusterName(clusterName)
+	c.Assert(err, check.IsNil)
+
+	gotName, err := s.ConfigS.GetClusterName()
+	c.Assert(err, check.IsNil)
+	clusterName.SetResourceID(gotName.GetResourceID())
+	fixtures.DeepCompare(c, clusterName, gotName)
+
+	err = s.ConfigS.DeleteClusterName()
+	c.Assert(err, check.IsNil)
+
+	_, err = s.ConfigS.GetClusterName()
+	fixtures.ExpectNotFound(c, err)
+
+	err = s.ConfigS.UpsertClusterName(clusterName)
+	c.Assert(err, check.IsNil)
+
+	gotName, err = s.ConfigS.GetClusterName()
+	c.Assert(err, check.IsNil)
+	clusterName.SetResourceID(gotName.GetResourceID())
+	fixtures.DeepCompare(c, clusterName, gotName)
 }
 
 // Events tests various events variations
 func (s *ServicesTestSuite) Events(c *check.C) {
 	ctx := context.TODO()
-	w, err := s.EventsS.NewWatcher(ctx, services.Watch{Kinds: []string{services.KindCertAuthority}})
+	w, err := s.EventsS.NewWatcher(ctx, services.Watch{
+		Kinds: []services.WatchKind{
+			{Kind: services.KindCertAuthority},
+		}})
 	c.Assert(err, check.IsNil)
 	defer w.Close()
+
+	select {
+	case event := <-w.Events():
+		c.Assert(event.Type, check.Equals, backend.OpInit)
+	case <-time.After(2 * time.Second):
+		c.Fatalf("timeout waiting for init event")
+	}
 
 	ca := NewTestCA(services.UserCA, "example.com")
 	c.Assert(s.CAS.UpsertCertAuthority(ca), check.IsNil)
@@ -844,6 +992,7 @@ func (s *ServicesTestSuite) Events(c *check.C) {
 		c.Assert(event.Type, check.Equals, backend.OpDelete)
 		header := &services.ResourceHeader{
 			Kind:     services.KindCertAuthority,
+			SubKind:  string(services.UserCA),
 			Version:  services.V3,
 			Metadata: ca.GetMetadata(),
 		}

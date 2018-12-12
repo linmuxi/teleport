@@ -28,7 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// EventsService provides events
+// EventsService implements service to watch for events
 type EventsService struct {
 	*logrus.Entry
 	backend backend.Backend
@@ -47,22 +47,41 @@ func (e *EventsService) NewWatcher(ctx context.Context, watch services.Watch) (s
 	if len(watch.Kinds) == 0 {
 		return nil, trace.BadParameter("global watches are not supported yet")
 	}
-	if len(watch.Kinds) > 1 {
-		return nil, trace.BadParameter("watches on multiple objects are not supported yet")
-	}
-	switch watch.Kinds[0] {
-	case services.KindCertAuthority:
-		prefix := []byte(backend.Key(authoritiesPrefix))
-		w, err := e.backend.NewWatcher(ctx, backend.Watch{
-			Prefix: prefix,
-		})
-		if err != nil {
-			return nil, trace.Wrap(err)
+	var parsers []parser
+	var prefixes [][]byte
+	for _, kind := range watch.Kinds {
+		switch kind.Kind {
+		case services.KindCertAuthority:
+			prefix := []byte(backend.Key(authoritiesPrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: (&certAuthorityParser{loadSecrets: kind.LoadSecrets}).parseCertAuthority})
+		case services.KindToken:
+			prefix := []byte(backend.Key(tokensPrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: parseProvisionToken})
+		case services.KindStaticTokens:
+			prefix := []byte(backend.Key(clusterConfigPrefix, staticTokensPrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: parseStaticTokens})
+		case services.KindClusterConfig:
+			prefix := []byte(backend.Key(clusterConfigPrefix, generalPrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: parseClusterConfig})
+		case services.KindClusterName:
+			prefix := []byte(backend.Key(clusterConfigPrefix, namePrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: parseClusterName})
+		default:
+			return nil, trace.BadParameter("watcher on object kind %q is not supported", kind)
 		}
-		return newWatcher(w, e.Entry, []parser{{prefix: prefix, parser: parseCertAuthority}}), nil
-	default:
-		return nil, trace.BadParameter("watcher on object kind %q is not supported", watch.Kinds[0])
 	}
+	w, err := e.backend.NewWatcher(ctx, backend.Watch{
+		Prefixes: prefixes,
+	})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return newWatcher(w, e.Entry, parsers), nil
 }
 
 func newWatcher(backendWatcher backend.Watcher, l *logrus.Entry, parsers []parser) *watcher {
@@ -94,6 +113,9 @@ func (w *watcher) Error() error {
 
 func (w *watcher) parseEvent(e backend.Event) (*services.Event, error) {
 	for _, p := range w.parsers {
+		if e.Type == backend.OpInit {
+			return &services.Event{Type: e.Type}, nil
+		}
 		if bytes.HasPrefix(e.Item.Key, p.prefix) {
 			resource, err := p.parser(e)
 			if err != nil {
@@ -141,15 +163,20 @@ func (w *watcher) Close() error {
 	return w.backendWatcher.Close()
 }
 
-func parseCertAuthority(event backend.Event) (services.Resource, error) {
+type certAuthorityParser struct {
+	loadSecrets bool
+}
+
+func (p *certAuthorityParser) parseCertAuthority(event backend.Event) (services.Resource, error) {
 	switch event.Type {
 	case backend.OpDelete:
-		name, err := base(event.Item.Key)
+		caType, name, err := splitCertAuthorityKey(event.Item.Key)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
 		return &services.ResourceHeader{
 			Kind:    services.KindCertAuthority,
+			SubKind: caType,
 			Version: services.V3,
 			Metadata: services.Metadata{
 				Name:      string(name),
@@ -161,9 +188,118 @@ func parseCertAuthority(event backend.Event) (services.Resource, error) {
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
-		// never send private signing keys over event stream
-		setSigningKeys(ca, false)
+		// never send private signing keys over event stream?
+		// this might not be true
+		setSigningKeys(ca, p.loadSecrets)
 		return ca, nil
+	default:
+		return nil, trace.BadParameter("event %v is not supported", event.Type)
+	}
+}
+
+func parseProvisionToken(event backend.Event) (services.Resource, error) {
+	switch event.Type {
+	case backend.OpDelete:
+		name, err := base(event.Item.Key)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return &services.ResourceHeader{
+			Kind:    services.KindToken,
+			Version: services.V2,
+			Metadata: services.Metadata{
+				Name:      string(name),
+				Namespace: defaults.Namespace,
+			},
+		}, nil
+	case backend.OpPut:
+		token, err := services.UnmarshalProvisionToken(event.Item.Value,
+			services.WithResourceID(event.Item.ID))
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return token, nil
+	default:
+		return nil, trace.BadParameter("event %v is not supported", event.Type)
+	}
+}
+
+func parseStaticTokens(event backend.Event) (services.Resource, error) {
+	switch event.Type {
+	case backend.OpDelete:
+		name, err := base(event.Item.Key)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return &services.ResourceHeader{
+			Kind:    services.KindStaticTokens,
+			Version: services.V2,
+			Metadata: services.Metadata{
+				Name:      string(name),
+				Namespace: defaults.Namespace,
+			},
+		}, nil
+	case backend.OpPut:
+		tokens, err := services.GetStaticTokensMarshaler().Unmarshal(event.Item.Value,
+			services.WithResourceID(event.Item.ID))
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return tokens, nil
+	default:
+		return nil, trace.BadParameter("event %v is not supported", event.Type)
+	}
+}
+
+func parseClusterConfig(event backend.Event) (services.Resource, error) {
+	switch event.Type {
+	case backend.OpDelete:
+		name, err := base(event.Item.Key)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return &services.ResourceHeader{
+			Kind:    services.KindClusterConfig,
+			Version: services.V2,
+			Metadata: services.Metadata{
+				Name:      string(name),
+				Namespace: defaults.Namespace,
+			},
+		}, nil
+	case backend.OpPut:
+		clusterConfig, err := services.GetClusterConfigMarshaler().Unmarshal(event.Item.Value,
+			services.WithResourceID(event.Item.ID))
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return clusterConfig, nil
+	default:
+		return nil, trace.BadParameter("event %v is not supported", event.Type)
+	}
+}
+
+func parseClusterName(event backend.Event) (services.Resource, error) {
+	switch event.Type {
+	case backend.OpDelete:
+		name, err := base(event.Item.Key)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return &services.ResourceHeader{
+			Kind:    services.KindClusterName,
+			Version: services.V2,
+			Metadata: services.Metadata{
+				Name:      string(name),
+				Namespace: defaults.Namespace,
+			},
+		}, nil
+	case backend.OpPut:
+		clusterName, err := services.GetClusterNameMarshaler().Unmarshal(event.Item.Value,
+			services.WithResourceID(event.Item.ID))
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return clusterName, nil
 	default:
 		return nil, trace.BadParameter("event %v is not supported", event.Type)
 	}
@@ -176,6 +312,15 @@ func base(key []byte) ([]byte, error) {
 		return nil, trace.NotFound("failed parsing %v", string(key))
 	}
 	return parts[len(parts)-1], nil
+}
+
+// splitCertAuthorityKey returns key and cert authority type
+func splitCertAuthorityKey(key []byte) (string, []byte, error) {
+	parts := bytes.Split(key, []byte{backend.Separator})
+	if len(parts) < 2 {
+		return "", nil, trace.NotFound("failed parsing %v", string(key))
+	}
+	return string(parts[len(parts)-2]), parts[len(parts)-1], nil
 }
 
 type parserFunc func(i backend.Event) (services.Resource, error)

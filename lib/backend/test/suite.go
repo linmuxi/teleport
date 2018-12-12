@@ -347,9 +347,18 @@ func (s *BackendSuite) Events(c *check.C) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	watcher, err := s.B.NewWatcher(ctx, backend.Watch{Prefix: prefix("")})
+	watcher, err := s.B.NewWatcher(ctx, backend.Watch{Prefixes: [][]byte{prefix("")}})
 	c.Assert(err, check.IsNil)
 	defer watcher.Close()
+
+	select {
+	case e := <-watcher.Events():
+		c.Assert(string(e.Type), check.Equals, string(backend.OpInit))
+	case <-watcher.Done():
+		c.Fatalf("Watcher has unexpectedly closed.")
+	case <-time.After(2 * time.Second):
+		c.Fatalf("Timeout waiting for event.")
+	}
 
 	item := &backend.Item{Key: prefix("b"), Value: []byte("val")}
 	_, err = s.B.Put(ctx, *item)
@@ -378,7 +387,7 @@ func (s *BackendSuite) WatchersClose(c *check.C) {
 	b, err := s.NewBackend()
 	c.Assert(err, check.IsNil)
 
-	watcher, err := b.NewWatcher(ctx, backend.Watch{Prefix: prefix("")})
+	watcher, err := b.NewWatcher(ctx, backend.Watch{Prefixes: [][]byte{prefix("")}})
 	c.Assert(err, check.IsNil)
 
 	// cancel context -> get watcher to close
@@ -391,7 +400,7 @@ func (s *BackendSuite) WatchersClose(c *check.C) {
 	}
 
 	// closing backend should close associated watcher too
-	watcher, err = b.NewWatcher(context.Background(), backend.Watch{Prefix: prefix("")})
+	watcher, err = b.NewWatcher(context.Background(), backend.Watch{Prefixes: [][]byte{prefix("")}})
 	c.Assert(err, check.IsNil)
 
 	b.Close()

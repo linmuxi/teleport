@@ -237,17 +237,6 @@ type SignupToken struct {
 	Expires   time.Time `json:"expires"`
 }
 
-// OIDCIdentity is OpenID Connect identity that is linked
-// to particular user and connector and lets user to log in using external
-// credentials, e.g. google
-type ExternalIdentity struct {
-	// ConnectorID is id of registered OIDC connector, e.g. 'google-example.com'
-	ConnectorID string `json:"connector_id"`
-
-	// Username is username supplied by external identity provider
-	Username string `json:"username"`
-}
-
 const ExternalIdentitySchema = `{
   "type": "object",
   "additionalProperties": false,

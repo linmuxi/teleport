@@ -92,16 +92,14 @@ func NewTunnelConnection(name string, spec TunnelConnectionSpecV2) (TunnelConnec
 	return conn, nil
 }
 
-// TunnelConnectionV2 is version 1 resource spec of the reverse tunnel
-type TunnelConnectionV2 struct {
-	// Kind is a resource kind
-	Kind string `json:"kind"`
-	// Version is a resource version
-	Version string `json:"version"`
-	// Metadata is Role metadata
-	Metadata Metadata `json:"metadata"`
-	// Spec contains user specification
-	Spec TunnelConnectionSpecV2 `json:"spec"`
+// GetKind returns resource kind
+func (r *TunnelConnectionV2) GetKind() string {
+	return r.Kind
+}
+
+// GetSubKind returns resource sub kind
+func (r *TunnelConnectionV2) GetSubKind() string {
+	return r.SubKind
 }
 
 // GetResourceID returns resource ID
@@ -208,16 +206,6 @@ func (r *TunnelConnectionV2) Check() error {
 	}
 
 	return nil
-}
-
-// TunnelConnectionSpecV2 is a specification for V2 tunnel connection
-type TunnelConnectionSpecV2 struct {
-	// ClusterName is a name of the cluster
-	ClusterName string `json:"cluster_name"`
-	// ProxyName is the name of the proxy server
-	ProxyName string `json:"proxy_name"`
-	// LastHeartbeat is a time of the last heartbeat
-	LastHeartbeat time.Time `json:"last_heartbeat,omitempty"`
 }
 
 // TunnelConnectionSpecV2Schema is JSON schema for reverse tunnel spec

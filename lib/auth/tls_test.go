@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Gravitational, Inc.
+Copyright 2017-2019 Gravitational, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -741,10 +741,10 @@ func (s *TLSSuite) TestClusterConfig(c *check.C) {
 	clt, err := s.server.NewClient(TestAdmin())
 	c.Assert(err, check.IsNil)
 
-	suite := &suite.ServicesTestSuite{
+	testSuite := &suite.ServicesTestSuite{
 		ConfigS: clt,
 	}
-	suite.ClusterConfig(c)
+	testSuite.ClusterConfig(c, suite.SkipDelete())
 }
 
 func (s *TLSSuite) TestTunnelConnectionsCRUD(c *check.C) {
@@ -1882,9 +1882,16 @@ func (s *TLSSuite) TestStreamEvents(c *check.C) {
 	defer clt.Close()
 
 	ctx := context.TODO()
-	w, err := clt.NewWatcher(ctx, services.Watch{Kinds: []string{services.KindCertAuthority}})
+	w, err := clt.NewWatcher(ctx, services.Watch{Kinds: []services.WatchKind{{Kind: services.KindCertAuthority}}})
 	c.Assert(err, check.IsNil)
 	defer w.Close()
+
+	select {
+	case <-time.After(2 * time.Second):
+		c.Fatalf("Timeout waiting for init event")
+	case event := <-w.Events():
+		c.Assert(event.Type, check.Equals, backend.OpInit)
+	}
 
 	// start rotation
 	gracePeriod := time.Hour
@@ -1902,32 +1909,17 @@ func (s *TLSSuite) TestStreamEvents(c *check.C) {
 	}, false)
 	c.Assert(err, check.IsNil)
 
-	timeoutC := time.After(3 * time.Second)
-waitLoop:
-	for {
-		select {
-		case <-timeoutC:
-			c.Fatalf("Timeout waiting for event")
-		case event := <-w.Events():
-			if event.Type != backend.OpPut {
-				log.Debugf("Skipping stale event %v", event)
-				continue waitLoop
-			}
-			if ca.GetResourceID() > event.Resource.GetResourceID() {
-				log.Debugf("Skipping stale event %v, latest object version is %v", event.Resource.GetResourceID(), ca.GetResourceID())
-				continue waitLoop
-			}
-			fixtures.DeepCompare(c, ca, event.Resource)
-			break waitLoop
-		}
-	}
+	expectResource(c, w, 3*time.Second, ca)
 
-	// nop roles user is not authorized to watch events
-	nopClt, err := s.server.NewClient(TestBuiltin(teleport.RoleNop))
+	// node role is not authorized to get certificate authority
+	// with secret data loaded
+	nodeClt, err := s.server.NewClient(TestBuiltin(teleport.RoleNode))
 	c.Assert(err, check.IsNil)
-	defer nopClt.Close()
+	defer nodeClt.Close()
 
-	w2, err := nopClt.NewWatcher(ctx, services.Watch{Kinds: []string{services.KindCertAuthority}})
+	w2, err := nodeClt.NewWatcher(ctx, services.Watch{
+		Kinds: []services.WatchKind{{Kind: services.KindCertAuthority, LoadSecrets: true}},
+	})
 	c.Assert(err, check.IsNil)
 	defer w2.Close()
 
@@ -1945,4 +1937,202 @@ waitLoop:
 	}
 
 	fixtures.ExpectAccessDenied(c, w2.Error())
+
+	// nop roles user is not authorized to watch events
+	nopClt, err := s.server.NewClient(TestBuiltin(teleport.RoleNop))
+	c.Assert(err, check.IsNil)
+	defer nopClt.Close()
+
+	w3, err := nopClt.NewWatcher(ctx, services.Watch{
+		Kinds: []services.WatchKind{{Kind: services.KindCertAuthority}},
+	})
+	c.Assert(err, check.IsNil)
+	defer w3.Close()
+
+	go func() {
+		select {
+		case <-w3.Events():
+		case <-w3.Done():
+		}
+	}()
+
+	select {
+	case <-time.After(time.Second):
+		c.Fatalf("time out expecting error")
+	case <-w3.Done():
+	}
+
+	fixtures.ExpectAccessDenied(c, w3.Error())
+}
+
+// TestStreamCacheEvents tests streaming of events of multiple kinds
+// used in caching service
+func (s *TLSSuite) TestStreamCacheEvents(c *check.C) {
+	clt, err := s.server.NewClient(TestBuiltin(teleport.RoleAdmin))
+	c.Assert(err, check.IsNil)
+	defer clt.Close()
+
+	ctx := context.TODO()
+	w, err := clt.NewWatcher(ctx, services.Watch{Kinds: []services.WatchKind{
+		{Kind: services.KindCertAuthority, LoadSecrets: true},
+		{Kind: services.KindStaticTokens},
+		{Kind: services.KindToken},
+		{Kind: services.KindClusterConfig},
+		{Kind: services.KindClusterName},
+	}})
+	c.Assert(err, check.IsNil)
+	defer w.Close()
+
+	select {
+	case <-time.After(2 * time.Second):
+		c.Fatalf("Timeout waiting for init event")
+	case event := <-w.Events():
+		c.Assert(event.Type, check.Equals, backend.OpInit)
+	}
+
+	// start rotation
+	gracePeriod := time.Hour
+	err = s.server.Auth().RotateCertAuthority(RotateRequest{
+		Type:        services.HostCA,
+		GracePeriod: &gracePeriod,
+		TargetPhase: services.RotationPhaseInit,
+		Mode:        services.RotationModeManual,
+	})
+	c.Assert(err, check.IsNil)
+
+	ca, err := s.server.Auth().GetCertAuthority(services.CertAuthID{
+		DomainName: s.server.ClusterName(),
+		Type:       services.HostCA,
+	}, true)
+	c.Assert(err, check.IsNil)
+
+	expectResource(c, w, 3*time.Second, ca)
+
+	// set static tokens
+	staticTokens, err := services.NewStaticTokens(services.StaticTokensSpecV2{
+		StaticTokens: []services.ProvisionTokenV1{
+			{
+				Token:   "tok1",
+				Roles:   teleport.Roles{teleport.RoleNode},
+				Expires: time.Now().UTC().Add(time.Hour),
+			},
+		},
+	})
+	c.Assert(err, check.IsNil)
+
+	err = s.server.Auth().SetStaticTokens(staticTokens)
+	c.Assert(err, check.IsNil)
+
+	staticTokens, err = s.server.Auth().GetStaticTokens()
+	c.Assert(err, check.IsNil)
+	expectResource(c, w, 3*time.Second, staticTokens)
+
+	// create provision token and expect the update event
+	token, err := services.NewProvisionToken(
+		"tok2", teleport.Roles{teleport.RoleProxy}, time.Now().UTC().Add(3*time.Hour))
+	c.Assert(err, check.IsNil)
+
+	err = s.server.Auth().UpsertToken(token)
+	c.Assert(err, check.IsNil)
+
+	token, err = s.server.Auth().GetToken(token.GetName())
+	c.Assert(err, check.IsNil)
+
+	expectResource(c, w, 3*time.Second, token)
+
+	// delete token and expect delete event
+	err = s.server.Auth().DeleteToken(token.GetName())
+	c.Assert(err, check.IsNil)
+	expectDeleteResource(c, w, 3*time.Second, &services.ResourceHeader{
+		Kind:    services.KindToken,
+		Version: services.V2,
+		Metadata: services.Metadata{
+			Namespace: defaults.Namespace,
+			Name:      token.GetName(),
+		},
+	})
+
+	// update cluster config to record at the proxy
+	clusterConfig, err := services.NewClusterConfig(services.ClusterConfigSpecV3{
+		SessionRecording: services.RecordAtProxy,
+		Audit: services.AuditConfig{
+			AuditEventsURI: []string{"dynamodb://audit_table_name", "file:///home/log"},
+		},
+	})
+	c.Assert(err, check.IsNil)
+	err = s.server.Auth().SetClusterConfig(clusterConfig)
+	c.Assert(err, check.IsNil)
+
+	clusterConfig, err = s.server.Auth().GetClusterConfig()
+	c.Assert(err, check.IsNil)
+	expectResource(c, w, 3*time.Second, clusterConfig)
+
+	// update cluster name resource metadata
+	clusterNameResource, err := s.server.Auth().GetClusterName()
+	c.Assert(err, check.IsNil)
+
+	// update the resource with different labels to test the change
+	clusterName := &services.ClusterNameV2{
+		Kind:    services.KindClusterName,
+		Version: services.V2,
+		Metadata: services.Metadata{
+			Name:      services.MetaNameClusterName,
+			Namespace: defaults.Namespace,
+			Labels: map[string]string{
+				"key": "val",
+			},
+		},
+		Spec: services.ClusterNameSpecV2{
+			ClusterName: clusterNameResource.GetClusterName(),
+		},
+	}
+
+	err = s.server.Auth().DeleteClusterName()
+	c.Assert(err, check.IsNil)
+	err = s.server.Auth().SetClusterName(clusterName)
+	c.Assert(err, check.IsNil)
+
+	clusterNameResource, err = s.server.Auth().ClusterConfiguration.GetClusterName()
+	c.Assert(err, check.IsNil)
+	expectResource(c, w, 3*time.Second, clusterNameResource)
+}
+
+func expectResource(c *check.C, w services.Watcher, timeout time.Duration, resource services.Resource) {
+	timeoutC := time.After(timeout)
+waitLoop:
+	for {
+		select {
+		case <-timeoutC:
+			c.Fatalf("Timeout waiting for event")
+		case event := <-w.Events():
+			if event.Type != backend.OpPut {
+				log.Debugf("Skipping event %v %v", event.Type, event.Resource.GetName())
+				continue
+			}
+			if resource.GetResourceID() > event.Resource.GetResourceID() {
+				log.Debugf("Skipping stale event %v %v %v %v, latest object version is %v", event.Type, event.Resource.GetKind(), event.Resource.GetName(), event.Resource.GetResourceID(), resource.GetResourceID())
+				continue waitLoop
+			}
+			fixtures.DeepCompare(c, resource, event.Resource)
+			break waitLoop
+		}
+	}
+}
+
+func expectDeleteResource(c *check.C, w services.Watcher, timeout time.Duration, resource services.Resource) {
+	timeoutC := time.After(timeout)
+waitLoop:
+	for {
+		select {
+		case <-timeoutC:
+			c.Fatalf("Timeout waiting for event")
+		case event := <-w.Events():
+			if event.Type != backend.OpDelete {
+				log.Debugf("Skipping stale event %v %v", event.Type, event.Resource.GetName())
+				continue
+			}
+			fixtures.DeepCompare(c, resource, event.Resource)
+			break waitLoop
+		}
+	}
 }

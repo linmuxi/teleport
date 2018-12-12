@@ -25,18 +25,6 @@ import (
 	"github.com/gravitational/trace"
 )
 
-// Namespace represents namespace resource specification
-type Namespace struct {
-	// Kind is a resource kind - always namespace
-	Kind string `json:"kind"`
-	// Version is a resource version
-	Version string `json:"version"`
-	// Metadata is Role metadata
-	Metadata Metadata `json:"metadata"`
-	// Spec contains namespace specification
-	Spec NamespaceSpec `json:"spec"`
-}
-
 // Check checks validity of all parameters and sets defaults
 func (n *Namespace) CheckAndSetDefaults() error {
 	if err := n.Metadata.CheckAndSetDefaults(); err != nil {
@@ -48,10 +36,6 @@ func (n *Namespace) CheckAndSetDefaults() error {
 	}
 
 	return nil
-}
-
-// NamespaceSpec is namespace spec
-type NamespaceSpec struct {
 }
 
 const NamespaceSpecSchema = `{

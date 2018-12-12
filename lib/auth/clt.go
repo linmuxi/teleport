@@ -598,28 +598,25 @@ func (c *Client) GenerateServerKeys(req GenerateServerKeysRequest) (*PackedKeys,
 }
 
 // GetTokens returns a list of active invitation tokens for nodes and users
-func (c *Client) GetTokens() (tokens []services.ProvisionToken, err error) {
+func (c *Client) GetTokens(opts ...services.MarshalOption) ([]services.ProvisionToken, error) {
 	out, err := c.Get(c.Endpoint("tokens"), url.Values{})
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+	var tokens []services.ProvisionTokenV1
 	if err := json.Unmarshal(out.Bytes(), &tokens); err != nil {
 		return nil, trace.Wrap(err)
 	}
-	return tokens, nil
+	return services.ProvisionTokensFromV1(tokens), nil
 }
 
 // GetToken returns provisioning token
-func (c *Client) GetToken(token string) (*services.ProvisionToken, error) {
+func (c *Client) GetToken(token string) (services.ProvisionToken, error) {
 	out, err := c.Get(c.Endpoint("tokens", token), url.Values{})
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	var tok services.ProvisionToken
-	if err := json.Unmarshal(out.Bytes(), &tok); err != nil {
-		return nil, trace.Wrap(err)
-	}
-	return &tok, nil
+	return services.UnmarshalProvisionToken(out.Bytes())
 }
 
 // DeleteToken deletes a given provisioning token on the auth server (CA). It
@@ -750,7 +747,14 @@ func (c *Client) NewWatcher(ctx context.Context, watch services.Watch) (services
 		return nil, trace.Wrap(err)
 	}
 	cancelCtx, cancel := context.WithCancel(ctx)
-	stream, err := clt.WatchEvents(cancelCtx, &proto.Watch{Kinds: watch.Kinds})
+	var protoWatch proto.Watch
+	for _, kind := range watch.Kinds {
+		protoWatch.Kinds = append(protoWatch.Kinds, proto.WatchKind{
+			Kind:        kind.Kind,
+			LoadSecrets: kind.LoadSecrets,
+		})
+	}
+	stream, err := clt.WatchEvents(cancelCtx, &protoWatch)
 	if err != nil {
 		cancel()
 		return nil, trail.FromGRPC(err)
@@ -1004,6 +1008,11 @@ func (c *Client) DeleteTunnelConnections(clusterName string) error {
 	}
 	_, err := c.Delete(c.Endpoint("tunnelconnections", clusterName))
 	return trace.Wrap(err)
+}
+
+// DeleteAllTokens deletes all tokens
+func (c *Client) DeleteAllTokens() error {
+	return trace.NotImplemented("not implemented")
 }
 
 // DeleteAllTunnelConnections deletes all tunnel connections
@@ -2102,7 +2111,7 @@ func (c *Client) DeleteRole(name string) error {
 }
 
 // GetClusterConfig returns cluster level configuration information.
-func (c *Client) GetClusterConfig() (services.ClusterConfig, error) {
+func (c *Client) GetClusterConfig(opts ...services.MarshalOption) (services.ClusterConfig, error) {
 	out, err := c.Get(c.Endpoint("configuration"), url.Values{})
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -2131,7 +2140,7 @@ func (c *Client) SetClusterConfig(cc services.ClusterConfig) error {
 	return nil
 }
 
-func (c *Client) GetClusterName() (services.ClusterName, error) {
+func (c *Client) GetClusterName(opts ...services.MarshalOption) (services.ClusterName, error) {
 	out, err := c.Get(c.Endpoint("configuration", "name"), url.Values{})
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -2157,6 +2166,10 @@ func (c *Client) SetClusterName(cn services.ClusterName) error {
 	}
 
 	return nil
+}
+
+func (c *Client) UpsertClusterName(cn services.ClusterName) error {
+	return trace.NotImplemented("not implemented")
 }
 
 func (c *Client) GetStaticTokens() (services.StaticTokens, error) {
@@ -2218,6 +2231,21 @@ func (c *Client) SetAuthPreference(cap services.AuthPreference) error {
 // GetLocalClusterName returns local cluster name
 func (c *Client) GetLocalClusterName() (string, error) {
 	return c.GetDomainName()
+}
+
+// DeleteStaticTokens deletes static tokens
+func (c *Client) DeleteStaticTokens() error {
+	return trace.NotImplemented("not implemented")
+}
+
+// DeleteClusterConfig deletes cluster config
+func (c *Client) DeleteClusterConfig() error {
+	return trace.NotImplemented("not implemented")
+}
+
+// DeleteClusterName deletes cluster name
+func (c *Client) DeleteClusterName() error {
+	return trace.NotImplemented("not implemented")
 }
 
 // UpsertLocalClusterName upserts local cluster name
@@ -2486,10 +2514,10 @@ type IdentityService interface {
 // of adding new nodes, auth servers and proxies to the cluster
 type ProvisioningService interface {
 	// GetTokens returns a list of active invitation tokens for nodes and users
-	GetTokens() (tokens []services.ProvisionToken, err error)
+	GetTokens(opts ...services.MarshalOption) (tokens []services.ProvisionToken, err error)
 
 	// GetToken returns provisioning token
-	GetToken(token string) (*services.ProvisionToken, error)
+	GetToken(token string) (services.ProvisionToken, error)
 
 	// DeleteToken deletes a given provisioning token on the auth server (CA). It
 	// could be a user token or a machine token

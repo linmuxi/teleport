@@ -546,7 +546,7 @@ func (s *APIServer) getTokens(auth ClientI, w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	return tokens, nil
+	return services.ProvisionTokensToV1(tokens), nil
 }
 
 // getTokens returns provisioning token by name

@@ -47,6 +47,7 @@ import (
 	"github.com/gravitational/teleport/lib/backend/legacy/boltbk"
 	"github.com/gravitational/teleport/lib/backend/legacy/dir"
 	"github.com/gravitational/teleport/lib/backend/lite"
+	"github.com/gravitational/teleport/lib/cache"
 	"github.com/gravitational/teleport/lib/client"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/events"
@@ -952,16 +953,11 @@ func (process *TeleportProcess) initAuthService() error {
 		AuditLog:       process.auditLog,
 	}
 
-	// admin access point is a caching access point used for frequently
-	// accessed data by auth server, e.g. cert authorities, users and roles
-	adminAuthServer, err := auth.NewAdminAuthServer(authServer, sessionService, process.auditLog)
+	authCache, err := process.newAccessCache(authServer.AuthServices, []string{"auth"})
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	adminAccessPoint, err := process.newLocalCache(adminAuthServer, []string{"auth"})
-	if err != nil {
-		return trace.Wrap(err)
-	}
+	authServer.SetCache(authCache)
 
 	log := logrus.WithFields(logrus.Fields{
 		trace.Component: teleport.Component(teleport.ComponentAuth, process.id),
@@ -976,7 +972,7 @@ func (process *TeleportProcess) initAuthService() error {
 		TLS:           tlsConfig,
 		APIConfig:     *apiConf,
 		LimiterConfig: cfg.Auth.Limiter,
-		AccessPoint:   adminAccessPoint,
+		AccessPoint:   authCache,
 		Component:     teleport.Component(teleport.ComponentAuth, process.id),
 	})
 	if err != nil {
@@ -1146,6 +1142,30 @@ func (process *TeleportProcess) onExit(serviceName string, callback func(interfa
 			callback(event.Payload)
 		}
 		return nil
+	})
+}
+
+// newAccessCache returns new local cache access point
+func (process *TeleportProcess) newAccessCache(clt services.Services, cacheName []string) (auth.AuthCache, error) {
+	// if caching is disabled, return access point
+	if !process.Config.CachePolicy.Enabled {
+		return clt, nil
+	}
+	path := filepath.Join(append([]string{process.Config.DataDir, "cache"}, cacheName...)...)
+	if err := os.MkdirAll(path, teleport.SharedDirMode); err != nil {
+		return nil, trace.ConvertSystemError(err)
+	}
+	cacheBackend, err := lite.NewWithConfig(process.ExitContext(), lite.Config{Path: path, EventsOff: true})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return cache.New(cache.Config{
+		Context:       process.ExitContext(),
+		Backend:       cacheBackend,
+		Events:        clt,
+		ClusterConfig: clt,
+		Provisioner:   clt,
+		Trust:         clt,
 	})
 }
 

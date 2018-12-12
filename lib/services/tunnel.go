@@ -47,16 +47,14 @@ func NewReverseTunnel(clusterName string, dialAddrs []string) ReverseTunnel {
 	}
 }
 
-// ReverseTunnelV2 is version 1 resource spec of the reverse tunnel
-type ReverseTunnelV2 struct {
-	// Kind is a resource kind - always resource
-	Kind string `json:"kind"`
-	// Version is a resource version
-	Version string `json:"version"`
-	// Metadata is Role metadata
-	Metadata Metadata `json:"metadata"`
-	// Spec contains user specification
-	Spec ReverseTunnelSpecV2 `json:"spec"`
+// GetKind returns resource kind
+func (r *ReverseTunnelV2) GetKind() string {
+	return r.Kind
+}
+
+// GetSubKind returns resource sub kind
+func (r *ReverseTunnelV2) GetSubKind() string {
+	return r.SubKind
 }
 
 // GetResourceID returns resource ID
@@ -162,15 +160,6 @@ func (r *ReverseTunnelV2) Check() error {
 	}
 
 	return nil
-}
-
-// ReverseTunnelSpecV2 is a specification for V2 reverse tunnel
-type ReverseTunnelSpecV2 struct {
-	// ClusterName is a domain name of remote cluster we are connecting to
-	ClusterName string `json:"cluster_name"`
-	// DialAddrs is a list of remote address to establish a connection to
-	// it's always SSH over TCP
-	DialAddrs []string `json:"dial_addrs,omitempty"`
 }
 
 // ReverseTunnelSpecV2Schema is JSON schema for reverse tunnel spec

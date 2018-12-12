@@ -363,7 +363,7 @@ func (s *WebSuite) TestNewUser(c *C) {
 	tokens, err := s.server.Auth().GetTokens()
 	c.Assert(err, IsNil)
 	c.Assert(len(tokens), Equals, 1)
-	c.Assert(tokens[0].Token, Equals, token)
+	c.Assert(tokens[0].GetName(), Equals, token)
 
 	clt := s.client()
 	re, err := clt.Get(context.Background(), clt.Endpoint("webapi", "users", "invites", token), url.Values{})

@@ -368,13 +368,35 @@ func (a *AuthWithRoles) KeepAliveNode(ctx context.Context, handle services.KeepA
 // NewWatcher returns a new event watcher
 func (a *AuthWithRoles) NewWatcher(ctx context.Context, watch services.Watch) (services.Watcher, error) {
 	if len(watch.Kinds) == 0 {
-		return nil, trace.AccessDenied("can't watch any event")
+		return nil, trace.AccessDenied("can't setup global watch")
 	}
 	for _, kind := range watch.Kinds {
-		switch kind {
-		case services.KindCertAuthority:
-			if err := a.action(defaults.Namespace, services.KindCertAuthority, services.VerbReadNoSecrets); err != nil {
+		switch kind.Kind {
+		case services.KindClusterConfig:
+			if err := a.action(defaults.Namespace, services.KindClusterConfig, services.VerbRead); err != nil {
 				return nil, trace.Wrap(err)
+			}
+		case services.KindClusterName:
+			if err := a.action(defaults.Namespace, services.KindClusterName, services.VerbRead); err != nil {
+				return nil, trace.Wrap(err)
+			}
+		case services.KindToken:
+			if err := a.action(defaults.Namespace, services.KindToken, services.VerbRead); err != nil {
+				return nil, trace.Wrap(err)
+			}
+		case services.KindStaticTokens:
+			if err := a.action(defaults.Namespace, services.KindStaticTokens, services.VerbRead); err != nil {
+				return nil, trace.Wrap(err)
+			}
+		case services.KindCertAuthority:
+			if kind.LoadSecrets {
+				if err := a.action(defaults.Namespace, services.KindCertAuthority, services.VerbRead); err != nil {
+					return nil, trace.Wrap(err)
+				}
+			} else {
+				if err := a.action(defaults.Namespace, services.KindCertAuthority, services.VerbReadNoSecrets); err != nil {
+					return nil, trace.Wrap(err)
+				}
 			}
 		default:
 			return nil, trace.AccessDenied("can't watch %v events", kind)
@@ -540,31 +562,31 @@ func (a *AuthWithRoles) DeleteToken(token string) error {
 	return a.authServer.DeleteToken(token)
 }
 
-func (a *AuthWithRoles) GetTokens() ([]services.ProvisionToken, error) {
+func (a *AuthWithRoles) GetTokens(opts ...services.MarshalOption) ([]services.ProvisionToken, error) {
 	if err := a.action(defaults.Namespace, services.KindToken, services.VerbList); err != nil {
 		return nil, trace.Wrap(err)
 	}
 	if err := a.action(defaults.Namespace, services.KindToken, services.VerbRead); err != nil {
 		return nil, trace.Wrap(err)
 	}
-	return a.authServer.GetTokens()
+	return a.authServer.GetTokens(opts...)
 }
 
-func (a *AuthWithRoles) GetToken(token string) (*services.ProvisionToken, error) {
+func (a *AuthWithRoles) GetToken(token string) (services.ProvisionToken, error) {
 	if err := a.action(defaults.Namespace, services.KindToken, services.VerbRead); err != nil {
 		return nil, trace.Wrap(err)
 	}
 	return a.authServer.GetToken(token)
 }
 
-func (a *AuthWithRoles) UpsertToken(token string, roles teleport.Roles, ttl time.Duration) error {
+func (a *AuthWithRoles) UpsertToken(token services.ProvisionToken) error {
 	if err := a.action(defaults.Namespace, services.KindToken, services.VerbCreate); err != nil {
 		return trace.Wrap(err)
 	}
 	if err := a.action(defaults.Namespace, services.KindToken, services.VerbUpdate); err != nil {
 		return trace.Wrap(err)
 	}
-	return a.authServer.UpsertToken(token, roles, ttl)
+	return a.authServer.UpsertToken(token)
 }
 
 func (a *AuthWithRoles) UpsertPassword(user string, password []byte) error {
@@ -1106,11 +1128,35 @@ func (a *AuthWithRoles) DeleteRole(name string) error {
 }
 
 // GetClusterConfig gets cluster level configuration.
-func (a *AuthWithRoles) GetClusterConfig() (services.ClusterConfig, error) {
+func (a *AuthWithRoles) GetClusterConfig(opts ...services.MarshalOption) (services.ClusterConfig, error) {
 	if err := a.action(defaults.Namespace, services.KindClusterConfig, services.VerbRead); err != nil {
 		return nil, trace.Wrap(err)
 	}
-	return a.authServer.GetClusterConfig()
+	return a.authServer.GetClusterConfig(opts...)
+}
+
+// DeleteClusterConfig deletes cluster config
+func (a *AuthWithRoles) DeleteClusterConfig() error {
+	if err := a.action(defaults.Namespace, services.KindClusterConfig, services.VerbDelete); err != nil {
+		return trace.Wrap(err)
+	}
+	return a.authServer.DeleteClusterConfig()
+}
+
+// DeleteClusterName deletes cluster name
+func (a *AuthWithRoles) DeleteClusterName() error {
+	if err := a.action(defaults.Namespace, services.KindClusterName, services.VerbDelete); err != nil {
+		return trace.Wrap(err)
+	}
+	return a.authServer.DeleteClusterName()
+}
+
+// DeleteStaticTokens deletes static tokens
+func (a *AuthWithRoles) DeleteStaticTokens() error {
+	if err := a.action(defaults.Namespace, services.KindStaticTokens, services.VerbDelete); err != nil {
+		return trace.Wrap(err)
+	}
+	return a.authServer.DeleteStaticTokens()
 }
 
 // SetClusterConfig sets cluster level configuration.
@@ -1125,7 +1171,7 @@ func (a *AuthWithRoles) SetClusterConfig(c services.ClusterConfig) error {
 }
 
 // GetClusterName gets the name of the cluster.
-func (a *AuthWithRoles) GetClusterName() (services.ClusterName, error) {
+func (a *AuthWithRoles) GetClusterName(opts ...services.MarshalOption) (services.ClusterName, error) {
 	if err := a.action(defaults.Namespace, services.KindClusterName, services.VerbRead); err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -1141,6 +1187,17 @@ func (a *AuthWithRoles) SetClusterName(c services.ClusterName) error {
 		return trace.Wrap(err)
 	}
 	return a.authServer.SetClusterName(c)
+}
+
+// UpsertClusterName sets the name of the cluster.
+func (a *AuthWithRoles) UpsertClusterName(c services.ClusterName) error {
+	if err := a.action(defaults.Namespace, services.KindClusterName, services.VerbCreate); err != nil {
+		return trace.Wrap(err)
+	}
+	if err := a.action(defaults.Namespace, services.KindClusterName, services.VerbUpdate); err != nil {
+		return trace.Wrap(err)
+	}
+	return a.authServer.UpsertClusterName(c)
 }
 
 // GetStaticTokens gets the list of static tokens used to provision nodes.
@@ -1179,6 +1236,11 @@ func (a *AuthWithRoles) SetAuthPreference(cap services.AuthPreference) error {
 	}
 
 	return a.authServer.SetAuthPreference(cap)
+}
+
+// DeleteAllTokens deletes all tokens
+func (a *AuthWithRoles) DeleteAllTokens() error {
+	return trace.NotImplemented("not implemented")
 }
 
 // DeleteAllCertAuthorities deletes all certificate authorities of a certain type

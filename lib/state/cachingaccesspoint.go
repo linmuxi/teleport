@@ -216,6 +216,17 @@ func (cs *CachingAuthClient) fetchAll() error {
 	return trace.NewAggregate(errors...)
 }
 
+// GetClsuterName is a part of auth.AccessPoint implementation
+func (cs *CachingAuthClient) GetClusterName(opts ...services.MarshalOption) (services.ClusterName, error) {
+	clusterName, err := cs.GetDomainName()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return services.NewClusterName(services.ClusterNameSpecV2{
+		ClusterName: clusterName,
+	})
+}
+
 // GetDomainName is a part of auth.AccessPoint implementation
 func (cs *CachingAuthClient) GetDomainName() (clusterName string, err error) {
 	cs.fetch(params{
@@ -237,15 +248,15 @@ func (cs *CachingAuthClient) GetDomainName() (clusterName string, err error) {
 	return
 }
 
-func (cs *CachingAuthClient) GetClusterConfig() (clusterConfig services.ClusterConfig, err error) {
+func (cs *CachingAuthClient) GetClusterConfig(opts ...services.MarshalOption) (clusterConfig services.ClusterConfig, err error) {
 	cs.fetch(params{
 		key: "clusterConfig",
 		fetch: func() error {
-			clusterConfig, err = cs.ap.GetClusterConfig()
+			clusterConfig, err = cs.ap.GetClusterConfig(opts...)
 			return err
 		},
 		useCache: func() error {
-			clusterConfig, err = cs.config.GetClusterConfig()
+			clusterConfig, err = cs.config.GetClusterConfig(opts...)
 			return err
 		},
 		updateCache: func() ([]string, error) {

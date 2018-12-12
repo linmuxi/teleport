@@ -131,7 +131,7 @@ func (s *ClusterSnapshotSuite) SetUpTest(c *check.C) {
 	})
 	c.Assert(err, check.IsNil)
 	staticTokens, err := services.NewStaticTokens(services.StaticTokensSpecV2{
-		StaticTokens: []services.ProvisionToken{},
+		StaticTokens: []services.ProvisionTokenV1{},
 	})
 	c.Assert(err, check.IsNil)
 	s.authServer, err = auth.NewAuthServer(&auth.InitConfig{

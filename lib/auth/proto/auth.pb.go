@@ -30,26 +30,31 @@ const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 type Operation int32
 
 const (
+	// INIT is sent as a first sentinel event
+	// on the watch channel
+	Operation_INIT Operation = 0
 	// PUT identifies created or updated object
-	Operation_PUT Operation = 0
+	Operation_PUT Operation = 1
 	// DELETE identifies deleted object
-	Operation_DELETE Operation = 1
+	Operation_DELETE Operation = 2
 )
 
 var Operation_name = map[int32]string{
-	0: "PUT",
-	1: "DELETE",
+	0: "INIT",
+	1: "PUT",
+	2: "DELETE",
 }
 var Operation_value = map[string]int32{
-	"PUT":    0,
-	"DELETE": 1,
+	"INIT":   0,
+	"PUT":    1,
+	"DELETE": 2,
 }
 
 func (x Operation) String() string {
 	return proto.EnumName(Operation_name, int32(x))
 }
 func (Operation) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_auth_6babc694dc8af6fc, []int{0}
+	return fileDescriptor_auth_f48957066dd46b64, []int{0}
 }
 
 // Event returns cluster event
@@ -61,6 +66,10 @@ type Event struct {
 	// Types that are valid to be assigned to Resource:
 	//	*Event_ResourceHeader
 	//	*Event_CertAuthority
+	//	*Event_StaticTokens
+	//	*Event_ProvisionToken
+	//	*Event_ClusterName
+	//	*Event_ClusterConfig
 	Resource             isEvent_Resource `protobuf_oneof:"Resource"`
 	XXX_NoUnkeyedLiteral struct{}         `json:"-"`
 	XXX_unrecognized     []byte           `json:"-"`
@@ -71,7 +80,7 @@ func (m *Event) Reset()         { *m = Event{} }
 func (m *Event) String() string { return proto.CompactTextString(m) }
 func (*Event) ProtoMessage()    {}
 func (*Event) Descriptor() ([]byte, []int) {
-	return fileDescriptor_auth_6babc694dc8af6fc, []int{0}
+	return fileDescriptor_auth_f48957066dd46b64, []int{0}
 }
 func (m *Event) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -112,9 +121,25 @@ type Event_ResourceHeader struct {
 type Event_CertAuthority struct {
 	CertAuthority *services.CertAuthorityV2 `protobuf:"bytes,3,opt,name=CertAuthority,oneof"`
 }
+type Event_StaticTokens struct {
+	StaticTokens *services.StaticTokensV2 `protobuf:"bytes,4,opt,name=StaticTokens,oneof"`
+}
+type Event_ProvisionToken struct {
+	ProvisionToken *services.ProvisionTokenV2 `protobuf:"bytes,5,opt,name=ProvisionToken,oneof"`
+}
+type Event_ClusterName struct {
+	ClusterName *services.ClusterNameV2 `protobuf:"bytes,6,opt,name=ClusterName,oneof"`
+}
+type Event_ClusterConfig struct {
+	ClusterConfig *services.ClusterConfigV3 `protobuf:"bytes,7,opt,name=ClusterConfig,oneof"`
+}
 
 func (*Event_ResourceHeader) isEvent_Resource() {}
 func (*Event_CertAuthority) isEvent_Resource()  {}
+func (*Event_StaticTokens) isEvent_Resource()   {}
+func (*Event_ProvisionToken) isEvent_Resource() {}
+func (*Event_ClusterName) isEvent_Resource()    {}
+func (*Event_ClusterConfig) isEvent_Resource()  {}
 
 func (m *Event) GetResource() isEvent_Resource {
 	if m != nil {
@@ -137,11 +162,43 @@ func (m *Event) GetCertAuthority() *services.CertAuthorityV2 {
 	return nil
 }
 
+func (m *Event) GetStaticTokens() *services.StaticTokensV2 {
+	if x, ok := m.GetResource().(*Event_StaticTokens); ok {
+		return x.StaticTokens
+	}
+	return nil
+}
+
+func (m *Event) GetProvisionToken() *services.ProvisionTokenV2 {
+	if x, ok := m.GetResource().(*Event_ProvisionToken); ok {
+		return x.ProvisionToken
+	}
+	return nil
+}
+
+func (m *Event) GetClusterName() *services.ClusterNameV2 {
+	if x, ok := m.GetResource().(*Event_ClusterName); ok {
+		return x.ClusterName
+	}
+	return nil
+}
+
+func (m *Event) GetClusterConfig() *services.ClusterConfigV3 {
+	if x, ok := m.GetResource().(*Event_ClusterConfig); ok {
+		return x.ClusterConfig
+	}
+	return nil
+}
+
 // XXX_OneofFuncs is for the internal use of the proto package.
 func (*Event) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
 	return _Event_OneofMarshaler, _Event_OneofUnmarshaler, _Event_OneofSizer, []interface{}{
 		(*Event_ResourceHeader)(nil),
 		(*Event_CertAuthority)(nil),
+		(*Event_StaticTokens)(nil),
+		(*Event_ProvisionToken)(nil),
+		(*Event_ClusterName)(nil),
+		(*Event_ClusterConfig)(nil),
 	}
 }
 
@@ -157,6 +214,26 @@ func _Event_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
 	case *Event_CertAuthority:
 		_ = b.EncodeVarint(3<<3 | proto.WireBytes)
 		if err := b.EncodeMessage(x.CertAuthority); err != nil {
+			return err
+		}
+	case *Event_StaticTokens:
+		_ = b.EncodeVarint(4<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.StaticTokens); err != nil {
+			return err
+		}
+	case *Event_ProvisionToken:
+		_ = b.EncodeVarint(5<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.ProvisionToken); err != nil {
+			return err
+		}
+	case *Event_ClusterName:
+		_ = b.EncodeVarint(6<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.ClusterName); err != nil {
+			return err
+		}
+	case *Event_ClusterConfig:
+		_ = b.EncodeVarint(7<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.ClusterConfig); err != nil {
 			return err
 		}
 	case nil:
@@ -185,6 +262,38 @@ func _Event_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) 
 		err := b.DecodeMessage(msg)
 		m.Resource = &Event_CertAuthority{msg}
 		return true, err
+	case 4: // Resource.StaticTokens
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(services.StaticTokensV2)
+		err := b.DecodeMessage(msg)
+		m.Resource = &Event_StaticTokens{msg}
+		return true, err
+	case 5: // Resource.ProvisionToken
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(services.ProvisionTokenV2)
+		err := b.DecodeMessage(msg)
+		m.Resource = &Event_ProvisionToken{msg}
+		return true, err
+	case 6: // Resource.ClusterName
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(services.ClusterNameV2)
+		err := b.DecodeMessage(msg)
+		m.Resource = &Event_ClusterName{msg}
+		return true, err
+	case 7: // Resource.ClusterConfig
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(services.ClusterConfigV3)
+		err := b.DecodeMessage(msg)
+		m.Resource = &Event_ClusterConfig{msg}
+		return true, err
 	default:
 		return false, nil
 	}
@@ -204,6 +313,26 @@ func _Event_OneofSizer(msg proto.Message) (n int) {
 		n += 1 // tag and wire
 		n += proto.SizeVarint(uint64(s))
 		n += s
+	case *Event_StaticTokens:
+		s := proto.Size(x.StaticTokens)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Event_ProvisionToken:
+		s := proto.Size(x.ProvisionToken)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Event_ClusterName:
+		s := proto.Size(x.ClusterName)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Event_ClusterConfig:
+		s := proto.Size(x.ClusterConfig)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
 	case nil:
 	default:
 		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
@@ -211,20 +340,20 @@ func _Event_OneofSizer(msg proto.Message) (n int) {
 	return n
 }
 
-// Watch
+// Watch specifies watch parameters
 type Watch struct {
 	// Kinds specifies object kinds to watch
-	Kinds                []string `protobuf:"bytes,1,rep,name=Kinds" json:"cert_authority,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	Kinds                []WatchKind `protobuf:"bytes,1,rep,name=Kinds" json:"kinds,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
+	XXX_unrecognized     []byte      `json:"-"`
+	XXX_sizecache        int32       `json:"-"`
 }
 
 func (m *Watch) Reset()         { *m = Watch{} }
 func (m *Watch) String() string { return proto.CompactTextString(m) }
 func (*Watch) ProtoMessage()    {}
 func (*Watch) Descriptor() ([]byte, []int) {
-	return fileDescriptor_auth_6babc694dc8af6fc, []int{1}
+	return fileDescriptor_auth_f48957066dd46b64, []int{1}
 }
 func (m *Watch) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -253,9 +382,54 @@ func (m *Watch) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Watch proto.InternalMessageInfo
 
+// WatchKind specifies resource kind to watch
+type WatchKind struct {
+	// Kind is a resource kind to watch
+	Kind string `protobuf:"bytes,1,opt,name=Kind,proto3" json:"kind"`
+	// LoadSecrets specifies whether to load secrets
+	LoadSecrets          bool     `protobuf:"varint,2,opt,name=LoadSecrets,proto3" json:"load_secrets"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *WatchKind) Reset()         { *m = WatchKind{} }
+func (m *WatchKind) String() string { return proto.CompactTextString(m) }
+func (*WatchKind) ProtoMessage()    {}
+func (*WatchKind) Descriptor() ([]byte, []int) {
+	return fileDescriptor_auth_f48957066dd46b64, []int{2}
+}
+func (m *WatchKind) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *WatchKind) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_WatchKind.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *WatchKind) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_WatchKind.Merge(dst, src)
+}
+func (m *WatchKind) XXX_Size() int {
+	return m.Size()
+}
+func (m *WatchKind) XXX_DiscardUnknown() {
+	xxx_messageInfo_WatchKind.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_WatchKind proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*Event)(nil), "proto.Event")
 	proto.RegisterType((*Watch)(nil), "proto.Watch")
+	proto.RegisterType((*WatchKind)(nil), "proto.WatchKind")
 	proto.RegisterEnum("proto.Operation", Operation_name, Operation_value)
 }
 
@@ -526,6 +700,62 @@ func (m *Event_CertAuthority) MarshalTo(dAtA []byte) (int, error) {
 	}
 	return i, nil
 }
+func (m *Event_StaticTokens) MarshalTo(dAtA []byte) (int, error) {
+	i := 0
+	if m.StaticTokens != nil {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintAuth(dAtA, i, uint64(m.StaticTokens.Size()))
+		n4, err := m.StaticTokens.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n4
+	}
+	return i, nil
+}
+func (m *Event_ProvisionToken) MarshalTo(dAtA []byte) (int, error) {
+	i := 0
+	if m.ProvisionToken != nil {
+		dAtA[i] = 0x2a
+		i++
+		i = encodeVarintAuth(dAtA, i, uint64(m.ProvisionToken.Size()))
+		n5, err := m.ProvisionToken.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n5
+	}
+	return i, nil
+}
+func (m *Event_ClusterName) MarshalTo(dAtA []byte) (int, error) {
+	i := 0
+	if m.ClusterName != nil {
+		dAtA[i] = 0x32
+		i++
+		i = encodeVarintAuth(dAtA, i, uint64(m.ClusterName.Size()))
+		n6, err := m.ClusterName.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n6
+	}
+	return i, nil
+}
+func (m *Event_ClusterConfig) MarshalTo(dAtA []byte) (int, error) {
+	i := 0
+	if m.ClusterConfig != nil {
+		dAtA[i] = 0x3a
+		i++
+		i = encodeVarintAuth(dAtA, i, uint64(m.ClusterConfig.Size()))
+		n7, err := m.ClusterConfig.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n7
+	}
+	return i, nil
+}
 func (m *Watch) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -542,19 +772,53 @@ func (m *Watch) MarshalTo(dAtA []byte) (int, error) {
 	var l int
 	_ = l
 	if len(m.Kinds) > 0 {
-		for _, s := range m.Kinds {
+		for _, msg := range m.Kinds {
 			dAtA[i] = 0xa
 			i++
-			l = len(s)
-			for l >= 1<<7 {
-				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
+			i = encodeVarintAuth(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
 			}
-			dAtA[i] = uint8(l)
-			i++
-			i += copy(dAtA[i:], s)
+			i += n
 		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *WatchKind) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *WatchKind) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Kind) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintAuth(dAtA, i, uint64(len(m.Kind)))
+		i += copy(dAtA[i:], m.Kind)
+	}
+	if m.LoadSecrets {
+		dAtA[i] = 0x10
+		i++
+		if m.LoadSecrets {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
@@ -604,14 +868,66 @@ func (m *Event_CertAuthority) Size() (n int) {
 	}
 	return n
 }
+func (m *Event_StaticTokens) Size() (n int) {
+	var l int
+	_ = l
+	if m.StaticTokens != nil {
+		l = m.StaticTokens.Size()
+		n += 1 + l + sovAuth(uint64(l))
+	}
+	return n
+}
+func (m *Event_ProvisionToken) Size() (n int) {
+	var l int
+	_ = l
+	if m.ProvisionToken != nil {
+		l = m.ProvisionToken.Size()
+		n += 1 + l + sovAuth(uint64(l))
+	}
+	return n
+}
+func (m *Event_ClusterName) Size() (n int) {
+	var l int
+	_ = l
+	if m.ClusterName != nil {
+		l = m.ClusterName.Size()
+		n += 1 + l + sovAuth(uint64(l))
+	}
+	return n
+}
+func (m *Event_ClusterConfig) Size() (n int) {
+	var l int
+	_ = l
+	if m.ClusterConfig != nil {
+		l = m.ClusterConfig.Size()
+		n += 1 + l + sovAuth(uint64(l))
+	}
+	return n
+}
 func (m *Watch) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.Kinds) > 0 {
-		for _, s := range m.Kinds {
-			l = len(s)
+		for _, e := range m.Kinds {
+			l = e.Size()
 			n += 1 + l + sovAuth(uint64(l))
 		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *WatchKind) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Kind)
+	if l > 0 {
+		n += 1 + l + sovAuth(uint64(l))
+	}
+	if m.LoadSecrets {
+		n += 2
 	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
@@ -744,6 +1060,134 @@ func (m *Event) Unmarshal(dAtA []byte) error {
 			}
 			m.Resource = &Event_CertAuthority{v}
 			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StaticTokens", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuth
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAuth
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &services.StaticTokensV2{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Resource = &Event_StaticTokens{v}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ProvisionToken", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuth
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAuth
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &services.ProvisionTokenV2{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Resource = &Event_ProvisionToken{v}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ClusterName", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuth
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAuth
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &services.ClusterNameV2{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Resource = &Event_ClusterName{v}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ClusterConfig", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuth
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAuth
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &services.ClusterConfigV3{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Resource = &Event_ClusterConfig{v}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipAuth(dAtA[iNdEx:])
@@ -799,6 +1243,88 @@ func (m *Watch) Unmarshal(dAtA []byte) error {
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Kinds", wireType)
 			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuth
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAuth
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Kinds = append(m.Kinds, WatchKind{})
+			if err := m.Kinds[len(m.Kinds)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAuth(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthAuth
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *WatchKind) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAuth
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: WatchKind: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: WatchKind: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Kind", wireType)
+			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
@@ -822,8 +1348,28 @@ func (m *Watch) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Kinds = append(m.Kinds, string(dAtA[iNdEx:postIndex]))
+			m.Kind = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LoadSecrets", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuth
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.LoadSecrets = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipAuth(dAtA[iNdEx:])
@@ -951,36 +1497,50 @@ var (
 	ErrIntOverflowAuth   = fmt.Errorf("proto: integer overflow")
 )
 
-func init() { proto.RegisterFile("auth.proto", fileDescriptor_auth_6babc694dc8af6fc) }
+func init() { proto.RegisterFile("auth.proto", fileDescriptor_auth_f48957066dd46b64) }
 
-var fileDescriptor_auth_6babc694dc8af6fc = []byte{
-	// 448 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x7c, 0x91, 0xd1, 0x8a, 0xd3, 0x40,
-	0x14, 0x86, 0x3b, 0x5b, 0xbb, 0xba, 0xa7, 0x5a, 0xca, 0xb8, 0x2c, 0x31, 0x4a, 0x5a, 0xf6, 0xaa,
-	0xa8, 0x24, 0x12, 0x11, 0x44, 0x2f, 0x64, 0xa3, 0x81, 0x85, 0x15, 0x95, 0x6e, 0x77, 0x05, 0x6f,
-	0x96, 0x34, 0x3d, 0xa6, 0x03, 0x69, 0x27, 0xcc, 0x9c, 0x14, 0xfa, 0x0a, 0x3e, 0x81, 0xcf, 0xe1,
-	0x53, 0xec, 0xa5, 0x4f, 0x50, 0xb4, 0xde, 0xf5, 0x29, 0x24, 0x93, 0xa6, 0xa5, 0x22, 0x7b, 0x95,
-	0x99, 0xf3, 0xe7, 0x7c, 0xdf, 0x49, 0x0e, 0x40, 0x94, 0xd3, 0xd8, 0xcd, 0x94, 0x24, 0xc9, 0x1b,
-	0xe6, 0x61, 0x1f, 0x26, 0x32, 0x91, 0xe6, 0xe8, 0x15, 0xa7, 0x32, 0xb4, 0x1f, 0x26, 0x52, 0x26,
-	0x29, 0x7a, 0xe6, 0x36, 0xcc, 0xbf, 0x7a, 0x38, 0xc9, 0x68, 0xbe, 0x0e, 0x5f, 0x25, 0x82, 0xc6,
-	0xf9, 0xd0, 0x8d, 0xe5, 0xc4, 0x4b, 0x54, 0x34, 0x13, 0x14, 0x91, 0x90, 0xd3, 0x28, 0xf5, 0x08,
-	0x53, 0xcc, 0xa4, 0x22, 0x2f, 0x15, 0x43, 0x4f, 0xa3, 0x9a, 0x89, 0x18, 0xb5, 0x47, 0xf3, 0x0c,
-	0x75, 0xd9, 0x7b, 0xfc, 0x6d, 0x0f, 0x1a, 0xe1, 0x0c, 0xa7, 0xc4, 0x5f, 0xc2, 0xad, 0xc1, 0x3c,
-	0x43, 0x8b, 0x75, 0x59, 0xaf, 0xe5, 0xb7, 0xcb, 0xdc, 0xfd, 0x98, 0xa1, 0x32, 0xb4, 0x80, 0xaf,
-	0x16, 0x9d, 0x56, 0xd1, 0xfa, 0x54, 0x4e, 0x04, 0x19, 0x7f, 0xdf, 0x74, 0xf0, 0x2f, 0xd0, 0xea,
-	0xa3, 0x96, 0xb9, 0x8a, 0xf1, 0x14, 0xa3, 0x11, 0x2a, 0x6b, 0xaf, 0xcb, 0x7a, 0x4d, 0xdf, 0x72,
-	0x2b, 0xa5, 0xbb, 0x9b, 0x07, 0x47, 0xab, 0x45, 0x87, 0xab, 0x75, 0x6d, 0xcb, 0x3b, 0xad, 0xf5,
-	0xff, 0x21, 0xf1, 0x2b, 0xb8, 0xf7, 0x16, 0x15, 0x9d, 0xe4, 0x34, 0x96, 0x4a, 0xd0, 0xdc, 0xaa,
-	0x1b, 0xf4, 0x83, 0x2d, 0x7a, 0x27, 0xbe, 0xf4, 0x83, 0x47, 0xab, 0x45, 0xc7, 0x8a, 0x51, 0xd1,
-	0x55, 0x54, 0x55, 0x77, 0x0c, 0xbb, 0xbc, 0x00, 0xe0, 0x4e, 0xa5, 0x3c, 0x7e, 0x0d, 0x8d, 0xcf,
-	0x11, 0xc5, 0x63, 0xee, 0x43, 0xe3, 0x4c, 0x4c, 0x47, 0xda, 0x62, 0xdd, 0x7a, 0xef, 0xe0, 0x66,
-	0x64, 0xbf, 0x7c, 0xf5, 0x71, 0x17, 0x0e, 0x36, 0x3f, 0x8b, 0xdf, 0x86, 0xfa, 0xa7, 0x8b, 0x41,
-	0xbb, 0xc6, 0x01, 0xf6, 0xdf, 0x85, 0xef, 0xc3, 0x41, 0xd8, 0x66, 0xfe, 0x0f, 0x06, 0xcd, 0x42,
-	0x7c, 0x5e, 0x8e, 0xce, 0xdf, 0x40, 0xeb, 0x1c, 0xa7, 0xa3, 0x33, 0xc4, 0xec, 0x24, 0x15, 0x33,
-	0xd4, 0xfc, 0xfe, 0xf6, 0xb3, 0x36, 0x55, 0xfb, 0xc8, 0x2d, 0x97, 0xef, 0x56, 0xcb, 0x77, 0xc3,
-	0xc2, 0xdb, 0x63, 0xfc, 0x09, 0x34, 0xcd, 0xbc, 0x66, 0x81, 0x9a, 0xdf, 0x5d, 0xef, 0xcc, 0xd4,
-	0xec, 0xea, 0x66, 0xc2, 0x67, 0x8c, 0xbf, 0x00, 0xb8, 0xc8, 0x34, 0x2a, 0xfa, 0x20, 0x47, 0xc8,
-	0xf9, 0xd6, 0x54, 0x8c, 0x83, 0xea, 0xd2, 0xb7, 0xff, 0x67, 0x0f, 0x0e, 0xaf, 0x7f, 0x3b, 0xb5,
-	0xeb, 0xa5, 0xc3, 0x7e, 0x2e, 0x1d, 0xf6, 0x6b, 0xe9, 0xb0, 0xef, 0x7f, 0x9c, 0xda, 0x70, 0xdf,
-	0xb0, 0x9f, 0xff, 0x0d, 0x00, 0x00, 0xff, 0xff, 0x4d, 0xe7, 0x50, 0xd4, 0xc1, 0x02, 0x00, 0x00,
+var fileDescriptor_auth_f48957066dd46b64 = []byte{
+	// 658 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x6c, 0x53, 0x5d, 0x4e, 0xdb, 0x4c,
+	0x14, 0x8d, 0x21, 0x81, 0x70, 0xc3, 0x97, 0x2f, 0x9a, 0x22, 0x30, 0x81, 0xc6, 0x88, 0xa7, 0x88,
+	0x56, 0x76, 0x65, 0x54, 0xa9, 0xea, 0x0b, 0xc2, 0x34, 0x12, 0x08, 0x44, 0x51, 0x12, 0x82, 0xd4,
+	0xaa, 0x8a, 0x1c, 0xe7, 0x92, 0x58, 0x38, 0x1e, 0x6b, 0x66, 0x12, 0x29, 0x1b, 0xe8, 0x1a, 0xba,
+	0x8e, 0xae, 0x82, 0xc7, 0xae, 0xc0, 0x6a, 0xe9, 0x9b, 0x57, 0x51, 0x79, 0x9c, 0x1f, 0x9b, 0xf6,
+	0x69, 0x66, 0xce, 0x99, 0x73, 0xae, 0xe7, 0xf8, 0x5e, 0x00, 0x7b, 0x2c, 0x86, 0x7a, 0xc0, 0xa8,
+	0xa0, 0xa4, 0x20, 0x97, 0xea, 0xd6, 0x80, 0x0e, 0xa8, 0xdc, 0x1a, 0xf1, 0x2e, 0x21, 0xab, 0x7b,
+	0x03, 0x4a, 0x07, 0x1e, 0x1a, 0xf2, 0xd4, 0x1b, 0xdf, 0x1b, 0x38, 0x0a, 0xc4, 0x74, 0x46, 0xbe,
+	0x1f, 0xb8, 0x62, 0x38, 0xee, 0xe9, 0x0e, 0x1d, 0x19, 0x03, 0x66, 0x4f, 0x5c, 0x61, 0x0b, 0x97,
+	0xfa, 0xb6, 0x67, 0x08, 0xf4, 0x30, 0xa0, 0x4c, 0x18, 0x9e, 0xdb, 0x33, 0x38, 0xb2, 0x89, 0xeb,
+	0x20, 0x37, 0xc4, 0x34, 0x40, 0x9e, 0x68, 0x0f, 0xbf, 0x16, 0xa0, 0xd0, 0x98, 0xa0, 0x2f, 0xc8,
+	0x3b, 0xc8, 0xb7, 0xa7, 0x01, 0xaa, 0xca, 0x81, 0x52, 0x2f, 0x9b, 0x95, 0x84, 0xd7, 0x3f, 0x06,
+	0xc8, 0xa4, 0x9b, 0x45, 0xa2, 0x50, 0x2b, 0xc7, 0xd2, 0xd7, 0x74, 0xe4, 0x0a, 0x59, 0xbf, 0x29,
+	0x15, 0xe4, 0x13, 0x94, 0x9b, 0xc8, 0xe9, 0x98, 0x39, 0x78, 0x8e, 0x76, 0x1f, 0x99, 0xba, 0x72,
+	0xa0, 0xd4, 0x4b, 0xa6, 0xaa, 0xcf, 0x4b, 0xea, 0x59, 0xde, 0xda, 0x8e, 0x42, 0x8d, 0xb0, 0x19,
+	0xb6, 0xf4, 0x3b, 0xcf, 0x35, 0x9f, 0x39, 0x91, 0x2e, 0xfc, 0x77, 0x86, 0x4c, 0x9c, 0x8e, 0xc5,
+	0x90, 0x32, 0x57, 0x4c, 0xd5, 0x55, 0x69, 0xbd, 0xbb, 0xb4, 0xce, 0xd0, 0x1d, 0xd3, 0xda, 0x8f,
+	0x42, 0x4d, 0x75, 0x90, 0x89, 0xae, 0x3d, 0x47, 0x33, 0x15, 0xb2, 0x7e, 0xe4, 0x33, 0x6c, 0xb6,
+	0xe2, 0xbc, 0x9c, 0x36, 0x7d, 0x40, 0x9f, 0xab, 0xf9, 0xe7, 0x9f, 0x9e, 0x66, 0x3b, 0xa6, 0xb5,
+	0x17, 0x85, 0xda, 0x0e, 0x97, 0x58, 0x57, 0x48, 0x30, 0xe3, 0x9e, 0x31, 0x23, 0x0e, 0x94, 0x6f,
+	0x18, 0x9d, 0xb8, 0xdc, 0xa5, 0xbe, 0x84, 0xd4, 0x82, 0xb4, 0xaf, 0x2e, 0xed, 0xb3, 0x7c, 0xc7,
+	0xb4, 0x5e, 0x46, 0xa1, 0xb6, 0x1b, 0xcc, 0xd1, 0xa4, 0x46, 0x36, 0xa2, 0xac, 0x84, 0xdc, 0x41,
+	0xe9, 0xcc, 0x1b, 0x73, 0x81, 0xec, 0xda, 0x1e, 0xa1, 0xba, 0x26, 0x2b, 0xec, 0xa4, 0x02, 0x5a,
+	0x92, 0x1d, 0xd3, 0xaa, 0x46, 0xa1, 0xb6, 0xed, 0x24, 0x50, 0xd7, 0xb7, 0x47, 0xd9, 0xf8, 0xd3,
+	0x4e, 0x32, 0xfb, 0xe4, 0x78, 0x46, 0xfd, 0x7b, 0x77, 0xa0, 0xae, 0xff, 0x95, 0x7d, 0x9a, 0xee,
+	0x1c, 0xcf, 0xb2, 0x9f, 0x99, 0x3b, 0x12, 0x7d, 0x96, 0x7d, 0x5a, 0x60, 0x01, 0x14, 0xe7, 0xbf,
+	0xfb, 0xf0, 0x1c, 0x0a, 0x77, 0xb6, 0x70, 0x86, 0xe4, 0x04, 0x0a, 0x97, 0xae, 0xdf, 0xe7, 0xaa,
+	0x72, 0xb0, 0x5a, 0x2f, 0x2d, 0x1a, 0x51, 0x92, 0x31, 0x61, 0xed, 0x3c, 0x86, 0x5a, 0x2e, 0x0a,
+	0xb5, 0xff, 0x1f, 0xe2, 0x6b, 0xa9, 0x6e, 0x4c, 0x74, 0x87, 0x5f, 0x60, 0x63, 0x71, 0x99, 0xec,
+	0x43, 0x3e, 0x5e, 0x65, 0x57, 0x6f, 0x58, 0xc5, 0x28, 0xd4, 0xf2, 0xb1, 0xac, 0x29, 0x51, 0x62,
+	0x42, 0xe9, 0x8a, 0xda, 0xfd, 0x16, 0x3a, 0x0c, 0x05, 0x97, 0x6d, 0x5b, 0xb4, 0x2a, 0x51, 0xa8,
+	0x6d, 0x7a, 0xd4, 0xee, 0x77, 0x79, 0x82, 0x37, 0xd3, 0x97, 0x8e, 0x8e, 0x60, 0x63, 0x31, 0x14,
+	0xa4, 0x08, 0xf9, 0x8b, 0xeb, 0x8b, 0x76, 0x25, 0x47, 0xd6, 0x61, 0xf5, 0xe6, 0xb6, 0x5d, 0x51,
+	0x08, 0xc0, 0xda, 0x87, 0xc6, 0x55, 0xa3, 0xdd, 0xa8, 0xac, 0x98, 0xdf, 0x15, 0x28, 0xc5, 0xad,
+	0xd6, 0x4a, 0x02, 0x23, 0x27, 0x50, 0x6e, 0xa1, 0xdf, 0xbf, 0x44, 0x0c, 0x4e, 0x3d, 0x77, 0x82,
+	0x9c, 0xbc, 0x58, 0x86, 0xb9, 0x40, 0xab, 0xdb, 0x7a, 0x32, 0xee, 0xfa, 0x7c, 0xdc, 0xf5, 0x46,
+	0xfc, 0xc0, 0xba, 0x42, 0x5e, 0x41, 0x49, 0xbe, 0x4d, 0x8e, 0x2c, 0x27, 0x9b, 0xe9, 0x70, 0xaa,
+	0xf3, 0x93, 0x24, 0xdf, 0x28, 0xe4, 0x2d, 0xc0, 0x6d, 0xc0, 0x91, 0x89, 0x6b, 0xda, 0x47, 0x42,
+	0x52, 0x2d, 0x8d, 0x6c, 0x82, 0xac, 0x63, 0x56, 0xff, 0x55, 0xdd, 0xda, 0x7a, 0xfc, 0x55, 0xcb,
+	0x3d, 0x3e, 0xd5, 0x94, 0x1f, 0x4f, 0x35, 0xe5, 0xe7, 0x53, 0x4d, 0xf9, 0xf6, 0xbb, 0x96, 0xeb,
+	0xad, 0x49, 0xef, 0xe3, 0x3f, 0x01, 0x00, 0x00, 0xff, 0xff, 0xb5, 0x9d, 0xcc, 0xf9, 0xb3, 0x04,
+	0x00, 0x00,
 }
