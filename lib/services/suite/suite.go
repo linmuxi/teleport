@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Gravitational, Inc.
+Copyright 2015-2019 Gravitational, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,6 +69,7 @@ func NewTestCA(caType services.CertAuthType, clusterName string, privateKeys ...
 
 	return &services.CertAuthorityV2{
 		Kind:    services.KindCertAuthority,
+		SubKind: string(caType),
 		Version: services.V2,
 		Metadata: services.Metadata{
 			Name:      clusterName,
@@ -956,11 +957,304 @@ func (s *ServicesTestSuite) ClusterConfig(c *check.C, opts ...SuiteOption) {
 
 // Events tests various events variations
 func (s *ServicesTestSuite) Events(c *check.C) {
+	testCases := []eventTest{
+		{
+			name: "Cert authority with secrets",
+			kind: services.WatchKind{
+				Kind:        services.KindCertAuthority,
+				LoadSecrets: true,
+			},
+			crud: func() services.Resource {
+				ca := NewTestCA(services.UserCA, "example.com")
+				c.Assert(s.CAS.UpsertCertAuthority(ca), check.IsNil)
+
+				out, err := s.CAS.GetCertAuthority(*ca.ID(), true)
+				c.Assert(err, check.IsNil)
+
+				c.Assert(s.CAS.DeleteCertAuthority(*ca.ID()), check.IsNil)
+				return out
+			},
+		},
+	}
+	s.runEventsTests(c, testCases)
+
+	testCases = []eventTest{
+		{
+			name: "Cert authority without secrets",
+			kind: services.WatchKind{
+				Kind:        services.KindCertAuthority,
+				LoadSecrets: false,
+			},
+			crud: func() services.Resource {
+				ca := NewTestCA(services.UserCA, "example.com")
+				c.Assert(s.CAS.UpsertCertAuthority(ca), check.IsNil)
+
+				out, err := s.CAS.GetCertAuthority(*ca.ID(), false)
+				c.Assert(err, check.IsNil)
+
+				c.Assert(s.CAS.DeleteCertAuthority(*ca.ID()), check.IsNil)
+				return out
+			},
+		},
+	}
+	s.runEventsTests(c, testCases)
+
+	testCases = []eventTest{
+		{
+			name: "Token",
+			kind: services.WatchKind{
+				Kind: services.KindToken,
+			},
+			crud: func() services.Resource {
+				expires := time.Now().UTC().Add(time.Hour)
+				t, err := services.NewProvisionToken("token",
+					teleport.Roles{teleport.RoleAuth, teleport.RoleNode}, expires)
+				c.Assert(err, check.IsNil)
+
+				c.Assert(s.ProvisioningS.UpsertToken(t), check.IsNil)
+
+				token, err := s.ProvisioningS.GetToken("token")
+				c.Assert(err, check.IsNil)
+
+				c.Assert(s.ProvisioningS.DeleteToken("token"), check.IsNil)
+				return token
+			},
+		},
+		{
+			name: "Namespace",
+			kind: services.WatchKind{
+				Kind: services.KindNamespace,
+			},
+			crud: func() services.Resource {
+				ns := services.Namespace{
+					Kind:    services.KindNamespace,
+					Version: services.V2,
+					Metadata: services.Metadata{
+						Name:      defaults.Namespace,
+						Namespace: defaults.Namespace,
+					},
+				}
+				err := s.PresenceS.UpsertNamespace(ns)
+				c.Assert(err, check.IsNil)
+
+				out, err := s.PresenceS.GetNamespace(ns.Metadata.Name)
+				c.Assert(err, check.IsNil)
+
+				err = s.PresenceS.DeleteNamespace(ns.Metadata.Name)
+				c.Assert(err, check.IsNil)
+
+				return out
+			},
+		},
+		{
+			name: "Static tokens",
+			kind: services.WatchKind{
+				Kind: services.KindStaticTokens,
+			},
+			crud: func() services.Resource {
+				staticTokens, err := services.NewStaticTokens(services.StaticTokensSpecV2{
+					StaticTokens: []services.ProvisionTokenV1{
+						{
+							Token:   "tok1",
+							Roles:   teleport.Roles{teleport.RoleNode},
+							Expires: time.Now().UTC().Add(time.Hour),
+						},
+					},
+				})
+				c.Assert(err, check.IsNil)
+
+				err = s.ConfigS.SetStaticTokens(staticTokens)
+				c.Assert(err, check.IsNil)
+
+				out, err := s.ConfigS.GetStaticTokens()
+				c.Assert(err, check.IsNil)
+
+				err = s.ConfigS.DeleteStaticTokens()
+				c.Assert(err, check.IsNil)
+
+				return out
+			},
+		},
+		{
+			name: "Cluster config",
+			kind: services.WatchKind{
+				Kind: services.KindClusterConfig,
+			},
+			crud: func() services.Resource {
+				config, err := services.NewClusterConfig(services.ClusterConfigSpecV3{})
+				c.Assert(err, check.IsNil)
+
+				err = s.ConfigS.SetClusterConfig(config)
+				c.Assert(err, check.IsNil)
+
+				out, err := s.ConfigS.GetClusterConfig()
+				c.Assert(err, check.IsNil)
+
+				err = s.ConfigS.DeleteClusterConfig()
+				c.Assert(err, check.IsNil)
+
+				return out
+			},
+		},
+		{
+			name: "Cluster name",
+			kind: services.WatchKind{
+				Kind: services.KindClusterName,
+			},
+			crud: func() services.Resource {
+				clusterName, err := services.NewClusterName(services.ClusterNameSpecV2{
+					ClusterName: "example.com",
+				})
+				c.Assert(err, check.IsNil)
+
+				err = s.ConfigS.SetClusterName(clusterName)
+				c.Assert(err, check.IsNil)
+
+				out, err := s.ConfigS.GetClusterName()
+				c.Assert(err, check.IsNil)
+
+				err = s.ConfigS.DeleteClusterName()
+				c.Assert(err, check.IsNil)
+				return out
+			},
+		},
+		{
+			name: "Role",
+			kind: services.WatchKind{
+				Kind: services.KindRole,
+			},
+			crud: func() services.Resource {
+				role, err := services.NewRole("role1", services.RoleSpecV3{
+					Options: services.RoleOptions{
+						MaxSessionTTL: services.Duration(time.Hour),
+					},
+					Allow: services.RoleConditions{
+						Logins:     []string{"root", "bob"},
+						NodeLabels: services.Labels{services.Wildcard: []string{services.Wildcard}},
+					},
+					Deny: services.RoleConditions{},
+				})
+
+				err = s.Access.UpsertRole(role)
+				c.Assert(err, check.IsNil)
+
+				out, err := s.Access.GetRole(role.GetName())
+				c.Assert(err, check.IsNil)
+
+				err = s.Access.DeleteRole(role.GetName())
+				c.Assert(err, check.IsNil)
+
+				return out
+			},
+		},
+		{
+			name: "User",
+			kind: services.WatchKind{
+				Kind: services.KindUser,
+			},
+			crud: func() services.Resource {
+				user := newUser("user1", []string{"admin"})
+				err := s.WebS.UpsertUser(user)
+
+				out, err := s.WebS.GetUser(user.GetName())
+				c.Assert(err, check.IsNil)
+
+				c.Assert(s.WebS.DeleteUser(user.GetName()), check.IsNil)
+				return out
+			},
+		},
+		{
+			name: "Node",
+			kind: services.WatchKind{
+				Kind: services.KindNode,
+			},
+			crud: func() services.Resource {
+				srv := newServer(services.KindNode, "srv1", "127.0.0.1:2022", defaults.Namespace)
+
+				_, err := s.PresenceS.UpsertNode(srv)
+				c.Assert(err, check.IsNil)
+
+				out, err := s.PresenceS.GetNodes(srv.Metadata.Namespace)
+				c.Assert(err, check.IsNil)
+
+				err = s.PresenceS.DeleteAllNodes(srv.Metadata.Namespace)
+				c.Assert(err, check.IsNil)
+
+				return out[0]
+			},
+		},
+		{
+			name: "Proxy",
+			kind: services.WatchKind{
+				Kind: services.KindProxy,
+			},
+			crud: func() services.Resource {
+				srv := newServer(services.KindProxy, "srv1", "127.0.0.1:2022", defaults.Namespace)
+
+				err := s.PresenceS.UpsertProxy(srv)
+				c.Assert(err, check.IsNil)
+
+				out, err := s.PresenceS.GetProxies()
+				c.Assert(err, check.IsNil)
+
+				err = s.PresenceS.DeleteAllProxies()
+				c.Assert(err, check.IsNil)
+
+				return out[0]
+			},
+		},
+		{
+			name: "Tunnel connection",
+			kind: services.WatchKind{
+				Kind: services.KindTunnelConnection,
+			},
+			crud: func() services.Resource {
+				conn, err := services.NewTunnelConnection("conn1", services.TunnelConnectionSpecV2{
+					ClusterName:   "example.com",
+					ProxyName:     "p1",
+					LastHeartbeat: time.Now().UTC(),
+				})
+				c.Assert(err, check.IsNil)
+
+				err = s.PresenceS.UpsertTunnelConnection(conn)
+				c.Assert(err, check.IsNil)
+
+				out, err := s.PresenceS.GetTunnelConnections("example.com")
+				c.Assert(err, check.IsNil)
+
+				err = s.PresenceS.DeleteAllTunnelConnections()
+				c.Assert(err, check.IsNil)
+
+				return out[0]
+			},
+		},
+		{
+			name: "Reverse tunnel",
+			kind: services.WatchKind{
+				Kind: services.KindReverseTunnel,
+			},
+			crud: func() services.Resource {
+				tunnel := newReverseTunnel("example.com", []string{"example.com:2023"})
+				c.Assert(s.PresenceS.UpsertReverseTunnel(tunnel), check.IsNil)
+
+				out, err := s.PresenceS.GetReverseTunnels()
+				c.Assert(err, check.IsNil)
+
+				err = s.PresenceS.DeleteReverseTunnel(tunnel.Spec.ClusterName)
+				c.Assert(err, check.IsNil)
+
+				return out[0]
+			},
+		},
+	}
+	s.runEventsTests(c, testCases)
+}
+
+func (s *ServicesTestSuite) runEventsTests(c *check.C, testCases []eventTest) {
 	ctx := context.TODO()
 	w, err := s.EventsS.NewWatcher(ctx, services.Watch{
-		Kinds: []services.WatchKind{
-			{Kind: services.KindCertAuthority},
-		}})
+		Kinds: eventsTestKinds(testCases),
+	})
 	c.Assert(err, check.IsNil)
 	defer w.Close()
 
@@ -971,35 +1265,51 @@ func (s *ServicesTestSuite) Events(c *check.C) {
 		c.Fatalf("timeout waiting for init event")
 	}
 
-	ca := NewTestCA(services.UserCA, "example.com")
-	c.Assert(s.CAS.UpsertCertAuthority(ca), check.IsNil)
+	for i, tc := range testCases {
+		comment := check.Commentf("test case %v; kind: %v, load secrets %v", i, tc.kind.Kind, tc.kind.LoadSecrets)
+		resource := tc.crud()
 
-	out, err := s.CAS.GetCertAuthority(*ca.ID(), false)
-	c.Assert(err, check.IsNil)
-
-	c.Assert(s.CAS.DeleteCertAuthority(*ca.ID()), check.IsNil)
-
-	select {
-	case event := <-w.Events():
-		c.Assert(event.Type, check.Equals, backend.OpPut)
-		fixtures.DeepCompare(c, event.Resource, out)
-	case <-time.After(2 * time.Second):
-		c.Fatalf("timeout waiting for event")
-	}
-
-	select {
-	case event := <-w.Events():
-		c.Assert(event.Type, check.Equals, backend.OpDelete)
-		header := &services.ResourceHeader{
-			Kind:     services.KindCertAuthority,
-			SubKind:  string(services.UserCA),
-			Version:  services.V3,
-			Metadata: ca.GetMetadata(),
+		select {
+		case event := <-w.Events():
+			c.Assert(event.Type, check.Equals, backend.OpPut, comment)
+			fixtures.DeepCompare(c, event.Resource, resource)
+		case <-time.After(2 * time.Second):
+			c.Fatalf("timeout waiting for event", comment)
 		}
-		c.Assert(header, check.NotNil)
-		fixtures.DeepCompare(c, event.Resource, header)
-	case <-time.After(2 * time.Second):
-		c.Fatalf("timeout waiting for event")
-	}
 
+		select {
+		case event := <-w.Events():
+			c.Assert(event.Type, check.Equals, backend.OpDelete, comment)
+			meta := resource.GetMetadata()
+			header := &services.ResourceHeader{
+				Kind:    resource.GetKind(),
+				SubKind: resource.GetSubKind(),
+				Version: resource.GetVersion(),
+				Metadata: services.Metadata{
+					Name:      meta.Name,
+					Namespace: meta.Namespace,
+				},
+			}
+			// delete events don't have IDs yet
+			header.SetResourceID(0)
+			c.Assert(header, check.NotNil)
+			fixtures.DeepCompare(c, event.Resource, header)
+		case <-time.After(2 * time.Second):
+			c.Fatalf("timeout waiting for event", comment)
+		}
+	}
+}
+
+type eventTest struct {
+	name string
+	kind services.WatchKind
+	crud func() services.Resource
+}
+
+func eventsTestKinds(tests []eventTest) []services.WatchKind {
+	out := make([]services.WatchKind, len(tests))
+	for i, tc := range tests {
+		out[i] = tc.kind
+	}
+	return out
 }

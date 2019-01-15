@@ -103,6 +103,11 @@ func (c *AuthPreferenceV2) GetSubKind() string {
 	return c.SubKind
 }
 
+// SetSubKind sets resource subkind
+func (c *AuthPreferenceV2) SetSubKind(sk string) {
+	c.SubKind = sk
+}
+
 // GetType returns the type of authentication.
 func (c *AuthPreferenceV2) GetType() string {
 	return c.Spec.Type

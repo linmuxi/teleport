@@ -328,6 +328,11 @@ type UnknownResource struct {
 	Raw []byte
 }
 
+// GetVersion returns resource version
+func (h *ResourceHeader) GetVersion() string {
+	return h.Version
+}
+
 // GetResourceID returns resource ID
 func (h *ResourceHeader) GetResourceID() int64 {
 	return h.Metadata.ID
@@ -378,6 +383,11 @@ func (h *ResourceHeader) GetSubKind() string {
 	return h.SubKind
 }
 
+// SetSubKind sets resource subkind
+func (h *ResourceHeader) SetSubKind(s string) {
+	h.SubKind = s
+}
+
 // UnmarshalJSON unmarshals header and captures raw state
 func (u *UnknownResource) UnmarshalJSON(raw []byte) error {
 	var h ResourceHeader
@@ -396,6 +406,10 @@ type Resource interface {
 	GetKind() string
 	// GetSubKind returns resource subkind
 	GetSubKind() string
+	// SetSubKind sets resource subkind
+	SetSubKind(string)
+	// GetVersion returns resource version
+	GetVersion() string
 	// GetName returns the name of the resource
 	GetName() string
 	// SetName sets the name of the resource

@@ -47,6 +47,11 @@ func NewReverseTunnel(clusterName string, dialAddrs []string) ReverseTunnel {
 	}
 }
 
+// GetVersion returns resource version
+func (r *ReverseTunnelV2) GetVersion() string {
+	return r.Version
+}
+
 // GetKind returns resource kind
 func (r *ReverseTunnelV2) GetKind() string {
 	return r.Kind
@@ -55,6 +60,11 @@ func (r *ReverseTunnelV2) GetKind() string {
 // GetSubKind returns resource sub kind
 func (r *ReverseTunnelV2) GetSubKind() string {
 	return r.SubKind
+}
+
+// SetSubKind sets resource subkind
+func (o *ReverseTunnelV2) SetSubKind(s string) {
+	o.SubKind = s
 }
 
 // GetResourceID returns resource ID
@@ -216,7 +226,7 @@ func GetReverseTunnelSchema() string {
 
 // UnmarshalReverseTunnel unmarshals reverse tunnel from JSON or YAML,
 // sets defaults and checks the schema
-func UnmarshalReverseTunnel(data []byte) (ReverseTunnel, error) {
+func UnmarshalReverseTunnel(data []byte, opts ...MarshalOption) (ReverseTunnel, error) {
 	if len(data) == 0 {
 		return nil, trace.BadParameter("missing tunnel data")
 	}
@@ -225,6 +235,11 @@ func UnmarshalReverseTunnel(data []byte) (ReverseTunnel, error) {
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+	cfg, err := collectOptions(opts)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
 	switch h.Version {
 	case "":
 		var r ReverseTunnelV1
@@ -232,18 +247,24 @@ func UnmarshalReverseTunnel(data []byte) (ReverseTunnel, error) {
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
+		v2 := r.V2()
+		v2.SetResourceID(cfg.ID)
 		return r.V2(), nil
 	case V2:
 		var r ReverseTunnelV2
-
-		if err := utils.UnmarshalWithSchema(GetReverseTunnelSchema(), &r, data); err != nil {
-			return nil, trace.BadParameter(err.Error())
+		if cfg.SkipValidation {
+			if err := utils.FastUnmarshal(data, &r); err != nil {
+				return nil, trace.BadParameter(err.Error())
+			}
+		} else {
+			if err := utils.UnmarshalWithSchema(GetReverseTunnelSchema(), &r, data); err != nil {
+				return nil, trace.BadParameter(err.Error())
+			}
 		}
-
 		if err := r.CheckAndSetDefaults(); err != nil {
 			return nil, trace.Wrap(err)
 		}
-
+		r.SetResourceID(cfg.ID)
 		return &r, nil
 	}
 	return nil, trace.BadParameter("reverse tunnel version %v is not supported", h.Version)
@@ -266,7 +287,7 @@ func GetReverseTunnelMarshaler() ReverseTunnelMarshaler {
 // ReverseTunnelMarshaler implements marshal/unmarshal of reverse tunnel implementations
 type ReverseTunnelMarshaler interface {
 	// UnmarshalReverseTunnel unmarshals reverse tunnel from binary representation
-	UnmarshalReverseTunnel(bytes []byte) (ReverseTunnel, error)
+	UnmarshalReverseTunnel(bytes []byte, opts ...MarshalOption) (ReverseTunnel, error)
 	// MarshalReverseTunnel marshals reverse tunnel to binary representation
 	MarshalReverseTunnel(ReverseTunnel, ...MarshalOption) ([]byte, error)
 }
@@ -274,8 +295,8 @@ type ReverseTunnelMarshaler interface {
 type TeleportTunnelMarshaler struct{}
 
 // UnmarshalReverseTunnel unmarshals reverse tunnel from JSON or YAML
-func (*TeleportTunnelMarshaler) UnmarshalReverseTunnel(bytes []byte) (ReverseTunnel, error) {
-	return UnmarshalReverseTunnel(bytes)
+func (*TeleportTunnelMarshaler) UnmarshalReverseTunnel(bytes []byte, opts ...MarshalOption) (ReverseTunnel, error) {
+	return UnmarshalReverseTunnel(bytes, opts...)
 }
 
 // MarshalRole marshalls role into JSON

@@ -142,6 +142,11 @@ func (la *LoginAttempt) Check() error {
 	return nil
 }
 
+// GetVersion returns resource version
+func (u *UserV2) GetVersion() string {
+	return u.Version
+}
+
 // GetKind returns resource kind
 func (u *UserV2) GetKind() string {
 	return u.Kind
@@ -150,6 +155,11 @@ func (u *UserV2) GetKind() string {
 // GetSubKind returns resource sub kind
 func (u *UserV2) GetSubKind() string {
 	return u.SubKind
+}
+
+// SetSubKind sets resource subkind
+func (u *UserV2) SetSubKind(s string) {
+	u.SubKind = s
 }
 
 // GetResourceID returns resource ID
@@ -498,7 +508,7 @@ func GetUserMarshaler() UserMarshaler {
 // mostly adds support for extended versions
 type UserMarshaler interface {
 	// UnmarshalUser from binary representation
-	UnmarshalUser(bytes []byte) (User, error)
+	UnmarshalUser(bytes []byte, opts ...MarshalOption) (User, error)
 	// MarshalUser to binary representation
 	MarshalUser(u User, opts ...MarshalOption) ([]byte, error)
 	// GenerateUser generates new user based on standard teleport user
@@ -522,12 +532,18 @@ func GetUserSchema(extensionSchema string) string {
 type TeleportUserMarshaler struct{}
 
 // UnmarshalUser unmarshals user from JSON
-func (*TeleportUserMarshaler) UnmarshalUser(bytes []byte) (User, error) {
+func (*TeleportUserMarshaler) UnmarshalUser(bytes []byte, opts ...MarshalOption) (User, error) {
 	var h ResourceHeader
 	err := json.Unmarshal(bytes, &h)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+
+	cfg, err := collectOptions(opts)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
 	switch h.Version {
 	case "":
 		var u UserV1
@@ -538,12 +554,21 @@ func (*TeleportUserMarshaler) UnmarshalUser(bytes []byte) (User, error) {
 		return u.V2(), nil
 	case V2:
 		var u UserV2
-		if err := utils.UnmarshalWithSchema(GetUserSchema(""), &u, bytes); err != nil {
-			return nil, trace.BadParameter(err.Error())
+		if cfg.SkipValidation {
+			if err := utils.FastUnmarshal(bytes, &u); err != nil {
+				return nil, trace.BadParameter(err.Error())
+			}
+		} else {
+			if err := utils.UnmarshalWithSchema(GetUserSchema(""), &u, bytes); err != nil {
+				return nil, trace.BadParameter(err.Error())
+			}
 		}
+
 		if err := u.CheckAndSetDefaults(); err != nil {
 			return nil, trace.Wrap(err)
 		}
+
+		u.SetResourceID(cfg.ID)
 
 		return &u, nil
 	}

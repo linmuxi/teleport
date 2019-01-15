@@ -210,9 +210,19 @@ type OIDCConnectorV2 struct {
 	Spec OIDCConnectorSpecV2 `json:"spec"`
 }
 
+// GetVersion returns resource version
+func (o *OIDCConnectorV2) GetVersion() string {
+	return o.Version
+}
+
 // GetSubKind returns resource sub kind
 func (o *OIDCConnectorV2) GetSubKind() string {
 	return o.SubKind
+}
+
+// SetSubKind sets resource subkind
+func (o *OIDCConnectorV2) SetSubKind(s string) {
+	o.SubKind = s
 }
 
 // GetKind returns resource kind

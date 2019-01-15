@@ -92,6 +92,11 @@ func NewTunnelConnection(name string, spec TunnelConnectionSpecV2) (TunnelConnec
 	return conn, nil
 }
 
+// GetVersion returns resource version
+func (r *TunnelConnectionV2) GetVersion() string {
+	return r.Version
+}
+
 // GetKind returns resource kind
 func (r *TunnelConnectionV2) GetKind() string {
 	return r.Kind
@@ -100,6 +105,11 @@ func (r *TunnelConnectionV2) GetKind() string {
 // GetSubKind returns resource sub kind
 func (r *TunnelConnectionV2) GetSubKind() string {
 	return r.SubKind
+}
+
+// SetSubKind sets resource subkind
+func (r *TunnelConnectionV2) SetSubKind(s string) {
+	r.SubKind = s
 }
 
 // GetResourceID returns resource ID
@@ -258,6 +268,8 @@ func UnmarshalTunnelConnection(data []byte, opts ...MarshalOption) (TunnelConnec
 		if err := r.CheckAndSetDefaults(); err != nil {
 			return nil, trace.Wrap(err)
 		}
+
+		r.SetResourceID(cfg.ID)
 
 		return &r, nil
 	}

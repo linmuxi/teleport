@@ -249,6 +249,7 @@ func NewCertAuthority(caType CertAuthType, clusterName string, signingKeys, chec
 	return &CertAuthorityV2{
 		Kind:    KindCertAuthority,
 		Version: V2,
+		SubKind: string(caType),
 		Metadata: Metadata{
 			Name:      clusterName,
 			Namespace: defaults.Namespace,
@@ -279,6 +280,11 @@ func CertAuthoritiesToV1(in []CertAuthority) ([]CertAuthorityV1, error) {
 	return out, nil
 }
 
+// GetVersion returns resource version
+func (c *CertAuthorityV2) GetVersion() string {
+	return c.Version
+}
+
 // GetKind returns resource kind
 func (c *CertAuthorityV2) GetKind() string {
 	return c.Kind
@@ -287,6 +293,11 @@ func (c *CertAuthorityV2) GetKind() string {
 // GetSubKind returns resource sub kind
 func (c *CertAuthorityV2) GetSubKind() string {
 	return c.SubKind
+}
+
+// SetSubKind sets resource subkind
+func (c *CertAuthorityV2) SetSubKind(s string) {
+	c.SubKind = s
 }
 
 // Clone returns a copy of the cert authority object.

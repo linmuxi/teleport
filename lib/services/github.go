@@ -120,6 +120,11 @@ type GithubClaims struct {
 	OrganizationToTeams map[string][]string
 }
 
+// GetVersion returns resource version
+func (c *GithubConnectorV3) GetVersion() string {
+	return c.Version
+}
+
 // GetKind returns resource kind
 func (c *GithubConnectorV3) GetKind() string {
 	return c.Kind
@@ -128,6 +133,11 @@ func (c *GithubConnectorV3) GetKind() string {
 // GetSubKind returns resource sub kind
 func (c *GithubConnectorV3) GetSubKind() string {
 	return c.SubKind
+}
+
+// SetSubKind sets resource subkind
+func (c *GithubConnectorV3) SetSubKind(s string) {
+	c.SubKind = s
 }
 
 // GetResourceID returns resource ID

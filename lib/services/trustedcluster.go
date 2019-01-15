@@ -275,6 +275,11 @@ func (c *TrustedClusterV2) CheckAndSetDefaults() error {
 	return nil
 }
 
+// GetVersion returns resource version
+func (c *TrustedClusterV2) GetVersion() string {
+	return c.Version
+}
+
 // GetKind returns resource kind
 func (c *TrustedClusterV2) GetKind() string {
 	return c.Kind
@@ -283,6 +288,11 @@ func (c *TrustedClusterV2) GetKind() string {
 // GetSubKind returns resource sub kind
 func (c *TrustedClusterV2) GetSubKind() string {
 	return c.SubKind
+}
+
+// SetSubKind sets resource subkind
+func (c *TrustedClusterV2) SetSubKind(s string) {
+	c.SubKind = s
 }
 
 // GetResourceID returns resource ID

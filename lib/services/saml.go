@@ -212,6 +212,11 @@ type SAMLConnectorV2 struct {
 	Spec SAMLConnectorSpecV2 `json:"spec"`
 }
 
+// GetVersion returns resource version
+func (o *SAMLConnectorV2) GetVersion() string {
+	return o.Version
+}
+
 // GetKind returns resource kind
 func (o *SAMLConnectorV2) GetKind() string {
 	return o.Kind
@@ -220,6 +225,11 @@ func (o *SAMLConnectorV2) GetKind() string {
 // GetSubKind returns resource sub kind
 func (o *SAMLConnectorV2) GetSubKind() string {
 	return o.SubKind
+}
+
+// SetSubKind sets resource subkind
+func (o *SAMLConnectorV2) SetSubKind(sk string) {
+	o.SubKind = sk
 }
 
 // GetResourceID returns resource ID

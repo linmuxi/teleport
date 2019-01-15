@@ -78,6 +78,11 @@ func DefaultStaticTokens() StaticTokens {
 	}
 }
 
+// GetVersion returns resource version
+func (c *StaticTokensV2) GetVersion() string {
+	return c.Version
+}
+
 // GetKind returns resource kind
 func (c *StaticTokensV2) GetKind() string {
 	return c.Kind
@@ -86,6 +91,11 @@ func (c *StaticTokensV2) GetKind() string {
 // GetSubKind returns resource sub kind
 func (c *StaticTokensV2) GetSubKind() string {
 	return c.SubKind
+}
+
+// SetSubKind sets resource subkind
+func (c *StaticTokensV2) SetSubKind(sk string) {
+	c.SubKind = sk
 }
 
 // GetResourceID returns resource ID
