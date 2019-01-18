@@ -29,6 +29,7 @@ import (
 
 	"github.com/gravitational/kingpin"
 	"github.com/gravitational/trace"
+	"github.com/pborman/ansi"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -132,10 +133,10 @@ func UserMessageFromError(err error) string {
 		// error occurred" message.
 		if er, ok := err.(*trace.TraceErr); ok {
 			if er.Message != "" {
-				return fmt.Sprintf("error: %v", er.Message)
+				return fmt.Sprintf("error: %v", StripControl(er.Message))
 			}
 		}
-		return fmt.Sprintf("error: %v", err.Error())
+		return fmt.Sprintf("error: %v", StripControl(err.Error()))
 	}
 	return ""
 }
@@ -165,6 +166,21 @@ func InitCLIParser(appName, appHelp string) (app *kingpin.Application) {
 
 	// set our own help template
 	return app.UsageTemplate(defaultUsageTemplate)
+}
+
+// StripControl strips all ANSI escape sequences from string and returns a
+// string that is safe to print on the CLI. This is to ensure that malicious
+// servers can not hide output. For more details, see:
+//   * https://sintonen.fi/advisories/scp-client-multiple-vulnerabilities.txt
+func StripControl(s string) string {
+	// Note that ansi.Strip() always returns a safe string. If it finds invalid
+	// escape sequences, they are returned in the error.
+	clear, err := ansi.Strip([]byte(s))
+	if err != nil {
+		log.Debugf("Found invalid escape sequences: %v.", err)
+	}
+
+	return string(clear)
 }
 
 // Usage template with compactly formatted commands.
