@@ -628,6 +628,13 @@
   version = "1.0.0"
 
 [[projects]]
+  digest = "1:0086be8bbb01a3b8648946e4b3f7dcdbe1921676d2725554ad36ecc98010f4cd"
+  name = "github.com/pborman/ansi"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "86f499584b0aace4fc5f2c82c4b47bd9d73bca80"
+
+[[projects]]
   digest = "1:cce3a18fb0b96b5015cd8ca03a57d20a662679de03c4dc4b6ff5f17ea2050fa6"
   name = "github.com/pborman/uuid"
   packages = ["."]
@@ -1099,6 +1106,7 @@
     "github.com/coreos/etcd/clientv3",
     "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
     "github.com/coreos/etcd/mvcc/mvccpb",
+    "github.com/coreos/go-oidc/http",
     "github.com/coreos/go-oidc/jose",
     "github.com/coreos/go-oidc/oauth2",
     "github.com/coreos/go-oidc/oidc",
@@ -1138,6 +1146,7 @@
     "github.com/mailgun/timetools",
     "github.com/mailgun/ttlmap",
     "github.com/mattn/go-sqlite3",
+    "github.com/pborman/ansi",
     "github.com/pborman/uuid",
     "github.com/pquerna/otp",
     "github.com/pquerna/otp/totp",

@@ -129,6 +129,10 @@ ignored = ["github.com/Sirupsen/logrus"]
   version = ">=1.0.0, <=11.0.0-gc55201b"
 
 [[constraint]]
+  name = "github.com/pborman/ansi"
+  revision = "86f499584b0aace4fc5f2c82c4b47bd9d73bca80"
+
+[[constraint]]
   name = "github.com/prometheus/client_golang"
   version = "0.8.0"
 
