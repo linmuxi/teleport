@@ -20,7 +20,6 @@ package web
 
 import (
 	"compress/gzip"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -1926,8 +1925,8 @@ func (h *Handler) AuthenticateRequest(w http.ResponseWriter, r *http.Request, ch
 			return nil, trace.AccessDenied("need auth")
 		}
 
-		if subtle.ConstantTimeCompare([]byte(creds.Password), []byte(ctx.GetWebSession().GetBearerToken())) != 1 {
-			logger.Warningf("Request failed: bad bearer token.")
+		if creds.Password != ctx.GetWebSession().GetBearerToken() {
+			logger.Warningf("bad bearer token")
 			return nil, trace.AccessDenied("bad bearer token")
 		}
 	}

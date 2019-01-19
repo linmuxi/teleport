@@ -111,6 +111,7 @@ func (s *AuthServer) CreateSignupToken(userv1 services.UserV1, ttl time.Duration
 	}
 
 	log.Infof("[AUTH API] created the signup token for %q", user)
+	//log.Infof("[AUTH API] created the signup token for %q , token:%q , tokenData:%q", user,token,tokenData)
 	return token, nil
 }
 

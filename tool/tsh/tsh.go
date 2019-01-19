@@ -45,7 +45,6 @@ import (
 	"github.com/gravitational/trace"
 
 	gops "github.com/google/gops/agent"
-	"github.com/jonboulle/clockwork"
 	"github.com/sirupsen/logrus"
 )
 
@@ -336,17 +335,17 @@ func onLogin(cf *CLIConf) {
 		key *client.Key
 	)
 
-	if cf.IdentityFileIn != "" {
+	/*if cf.IdentityFileIn != "" {
 		utils.FatalError(trace.BadParameter("-i flag cannot be used here"))
 	}
 
 	if cf.IdentityFormat != client.IdentityFormatOpenSSH && cf.IdentityFormat != client.IdentityFormatFile {
 		utils.FatalError(trace.BadParameter("invalid identity format: %s", cf.IdentityFormat))
-	}
+	}*/
 
 	// Get the status of the active profile ~/.tsh/profile as well as the status
 	// of any other proxies the user is logged into.
-	profile, profiles, err := client.Status("", cf.Proxy)
+	//profile, profiles, err := client.Status("", cf.Proxy)
 	if err != nil {
 		if !trace.IsNotFound(err) {
 			utils.FatalError(err)
@@ -360,7 +359,7 @@ func onLogin(cf *CLIConf) {
 	}
 
 	// client is already logged in and profile is not expired
-	if profile != nil && !profile.IsExpired(clockwork.NewRealClock()) {
+	/*if profile != nil && !profile.IsExpired(clockwork.NewRealClock()) {
 		switch {
 		// in case if nothing is specified, print current status
 		case cf.Proxy == "" && cf.SiteName == "":
@@ -383,7 +382,7 @@ func onLogin(cf *CLIConf) {
 			// otherwise just passthrough to standard login
 		default:
 		}
-	}
+	}*/
 
 	if cf.Username == "" {
 		cf.Username = tc.Username

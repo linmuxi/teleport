@@ -52,7 +52,7 @@ var DefaultImplicitRules = []Rule{
 	NewRule(KindNode, RO()),
 	NewRule(KindAuthServer, RO()),
 	NewRule(KindReverseTunnel, RO()),
-	NewRule(KindCertAuthority, ReadNoSecrets()),
+	NewRule(KindCertAuthority, RO()),
 	NewRule(KindClusterAuthPreference, RO()),
 	NewRule(KindClusterName, RO()),
 	NewRule(KindSSHSession, RO()),
@@ -65,7 +65,7 @@ var DefaultCertAuthorityRules = []Rule{
 	NewRule(KindNode, RO()),
 	NewRule(KindAuthServer, RO()),
 	NewRule(KindReverseTunnel, RO()),
-	NewRule(KindCertAuthority, ReadNoSecrets()),
+	NewRule(KindCertAuthority, RO()),
 }
 
 // RoleNameForUser returns role name associated with a user.
@@ -1408,7 +1408,8 @@ func MatchLabels(selector Labels, target map[string]string) (bool, string) {
 	}
 
 	// Perform full match.
-	for key, selectorValues := range selector {
+	// 默认是角色的标签必须全匹配node的标签才算是满足访问node的权限；
+	/*for key, selectorValues := range selector {
 		targetVal, hasKey := target[key]
 		if !hasKey {
 			return false, fmt.Sprintf("no key match: '%v'", key)
@@ -1417,8 +1418,18 @@ func MatchLabels(selector Labels, target map[string]string) (bool, string) {
 			return false, fmt.Sprintf("no value match: got '%v' want: '%v'", targetVal, selectorValues)
 		}
 	}
+	return true, "matched"*/
 
-	return true, "matched"
+	// 20190109 修改为只要角色的标签有一个满足node的标签就算是可以访问node的权限
+	for key, selectorValues := range selector {
+		targetVal, hasKey := target[key]
+		if hasKey {
+			return true, "matched"
+		}
+		log.Debugf("key:%v,value:%v,hashKey:%v,targetVal:%v", key, selectorValues, hasKey, targetVal)
+	}
+	return false, fmt.Sprintf("no key match")
+
 }
 
 // RoleNames returns a slice with role names

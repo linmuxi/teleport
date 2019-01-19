@@ -18,6 +18,7 @@ package common
 
 import (
 	"fmt"
+	"github.com/gravitational/teleport/lib/backend"
 	"io"
 	"os"
 
@@ -73,6 +74,7 @@ func (g *ResourceCommand) Initialize(app *kingpin.Application, config *service.C
 		services.KindTrustedCluster:  g.createTrustedCluster,
 		services.KindGithubConnector: g.createGithubConnector,
 		services.KindCertAuthority:   g.createCertAuthority,
+		services.KindRole:            g.createRole,
 	}
 	g.config = config
 
@@ -261,6 +263,20 @@ func (u *ResourceCommand) createUser(client auth.ClientI, raw services.UnknownRe
 		return trace.Wrap(err)
 	}
 	fmt.Printf("user '%s' has been updated\n", userName)
+	return nil
+}
+
+// createRole implements 'tctl create role.yaml' command
+func (u *ResourceCommand) createRole(client auth.ClientI, raw services.UnknownResource) error {
+	role, err := services.GetRoleMarshaler().UnmarshalRole(raw.Raw)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	roleName := role.GetName()
+	if err := client.UpsertRole(role, backend.Forever); err != nil {
+		return trace.Wrap(err)
+	}
+	fmt.Printf("role '%s' has been updated\n", roleName)
 	return nil
 }
 

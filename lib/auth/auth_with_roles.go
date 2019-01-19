@@ -362,10 +362,19 @@ func (a *AuthWithRoles) filterNodes(nodes []services.Server) ([]services.Server,
 
 	// Loop over all nodes and check if the caller has access.
 	filteredNodes := make([]services.Server, 0, len(nodes))
+
+	log.WithFields(logrus.Fields{
+		"user":  a.user.GetName(),
+		"roles": roles,
+	}).Debugf(
+		"XXX allowedLogins:%v，filteredNodes:%v，NODES：",
+		allowedLogins, filteredNodes, nodes)
+
 NextNode:
 	for _, node := range nodes {
 		for login, _ := range allowedLogins {
 			err := roles.CheckAccessToServer(login, node)
+			// 能访问的节点，会返回err
 			if err == nil {
 				filteredNodes = append(filteredNodes, node)
 				continue NextNode

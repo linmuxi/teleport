@@ -27,7 +27,8 @@ module.exports = {
   entry: {
     app: ['./src/app/index.jsx'],
     vendor: ['./src/app/vendor'],
-    styles: ['./src/styles/grv.scss']
+    styles: ['./src/styles/grv.scss'],
+    smy: ['./src/smy/md5','./src/smy/watermark']
   },
 
   output: {

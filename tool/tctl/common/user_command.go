@@ -63,6 +63,7 @@ func (u *UserCommand) Initialize(app *kingpin.Application, config *service.Confi
 	u.userAdd.Flag("ttl", fmt.Sprintf("Set expiration time for token, default is %v hour, maximum is %v hours",
 		int(defaults.SignupTokenTTL/time.Hour), int(defaults.MaxSignupTokenTTL/time.Hour))).
 		Default(fmt.Sprintf("%v", defaults.SignupTokenTTL)).DurationVar(&u.ttl)
+	u.userAdd.Flag("roles", "role ss").Default("").StringVar(&u.roles)
 	u.userAdd.Alias(AddUserHelp)
 
 	u.userUpdate = users.Command("update", "Update properties for existing user").Hidden()
@@ -105,10 +106,15 @@ func (u *UserCommand) Add(client auth.ClientI) error {
 	if u.kubeGroups != "" {
 		kubeGroups = strings.Split(u.kubeGroups, ",")
 	}
+	var roles []string
+	if u.roles != "" {
+		roles = strings.Split(u.roles, ",")
+	}
 	user := services.UserV1{
 		Name:          u.login,
 		AllowedLogins: strings.Split(u.allowedLogins, ","),
 		KubeGroups:    kubeGroups,
+		Roles:         roles,
 	}
 	token, err := client.CreateSignupToken(user, u.ttl)
 	if err != nil {

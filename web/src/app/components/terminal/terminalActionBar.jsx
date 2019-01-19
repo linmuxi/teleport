@@ -78,7 +78,7 @@ class ActionBar extends React.Component {
         <div className="grv-terminal-actions-participans">
           {children}
         </div>
-        <div className={fileTransferClass}>
+        {/*<div className={fileTransferClass}>
           <a title="Download files"
             className="grv-terminal-actions-files-btn m-b-sm"
             onClick={this.openDownloadDialog}>
@@ -89,7 +89,7 @@ class ActionBar extends React.Component {
             onClick={this.openUploadDialog}>
             <i className="fa fa-upload" />
           </a>
-        </div>
+        </div>*/}
       </div>
     )
   }

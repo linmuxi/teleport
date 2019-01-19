@@ -22,6 +22,7 @@ package config
 
 import (
 	"bufio"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/url"
@@ -474,6 +475,7 @@ func applyProxyConfig(fc *FileConfig, cfg *service.Config) error {
 		}
 
 		// read in certificate chain from disk
+		fmt.Println(">>>>>>>>>>>>>>>>>>>" + fc.Proxy.CertFile)
 		certificateChainBytes, err := utils.ReadPath(fc.Proxy.CertFile)
 		if err != nil {
 			return trace.Wrap(err)

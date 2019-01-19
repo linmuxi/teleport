@@ -871,6 +871,7 @@ func migrateRemoteClusters(asrv *AuthServer) error {
 // key storage (dataDir). Used for data migrations
 func readIdentityCompat(dataDir string, id IdentityID) (i *Identity, err error) {
 	path := keysPath(dataDir, id)
+	log.Infof(">>>>>>>>>>DataDir %v , paths: %v", dataDir, path)
 
 	keyBytes, err := utils.ReadPath(path.key)
 	if err != nil {
@@ -904,6 +905,7 @@ func readIdentityCompat(dataDir string, id IdentityID) (i *Identity, err error) 
 
 	// Inject nodename back into identity read from disk.
 	identity.ID.NodeName = id.NodeName
+	log.Infof(">>>>>>>>>>end DataDir %v , paths: %v , identity:%v", dataDir, path, identity)
 
 	return identity, nil
 }

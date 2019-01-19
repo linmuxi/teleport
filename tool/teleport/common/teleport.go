@@ -112,7 +112,7 @@ func Run(options Options) (executedCommand string, conf *service.Config) {
 	start.Flag("permit-user-env",
 		"Enables reading of ~/.tsh/environment when creating a session").Hidden().BoolVar(&ccf.PermitUserEnvironment)
 	start.Flag("insecure",
-		"Insecure mode disables certificate validation [NOT FOR PRODUCTION]").Hidden().BoolVar(&ccf.InsecureMode)
+		"Insecure mode disables certificate validation [NOT FOR PRODUCTION]"). /*.Hidden()*/ BoolVar(&ccf.InsecureMode)
 
 	// define start's usage info (we use kingpin's "alias" field for this)
 	start.Alias(usageNotes + usageExamples)
@@ -136,6 +136,7 @@ func Run(options Options) (executedCommand string, conf *service.Config) {
 
 	// create the default configuration:
 	conf = service.MakeDefaultConfig()
+	log.Infof(">>>>>> defualtConfig:%v", conf)
 
 	// execute the selected command unless we're running tests
 	switch command {

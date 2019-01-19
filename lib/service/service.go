@@ -361,6 +361,7 @@ func Run(ctx context.Context, cfg Config, newTeleport NewProcess) error {
 	if newTeleport == nil {
 		newTeleport = newTeleportProcess
 	}
+	log.Infof(">>>>>FF: cfg:%v", cfg)
 	copyCfg := cfg
 	srv, err := newTeleport(&copyCfg)
 	if err != nil {
@@ -527,7 +528,7 @@ func NewTeleport(cfg *Config) (*TeleportProcess, error) {
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-
+	log.Infof(">>>>>>EF: cfg:%v", cfg)
 	processID := fmt.Sprintf("%v", nextProcessID())
 	process := &TeleportProcess{
 		Clock:               clockwork.NewRealClock(),
